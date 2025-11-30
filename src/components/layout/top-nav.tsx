@@ -11,15 +11,8 @@ import { cn } from "@/lib/utils";
 
 function LogoPlaceholder() {
 	return (
-		<div className="flex items-center gap-2">
-			<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-cool">
-				<span className="font-primary text-sm font-bold text-white">
-					FT
-				</span>
-			</div>
-			<span className="hidden font-primary text-lg font-semibold text-primary-text lg:inline">
-				Fitness Tracker
-			</span>
+		<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-cool">
+			<span className="font-primary text-sm font-bold text-white">FT</span>
 		</div>
 	);
 }
@@ -90,10 +83,8 @@ export function TopNav() {
 	return (
 		<header
 			className={cn(
-				"sticky top-0 z-30 h-16 border-b border-border transition-all duration-200",
-				scrolled
-					? "bg-primary-surface/80 backdrop-blur-md shadow-sm"
-					: "bg-primary-surface"
+				"sticky top-0 z-30 h-16 transition-all duration-200",
+				scrolled ? "backdrop-blur-md" : "bg-transparent"
 			)}
 		>
 			<div className="flex h-full items-center justify-between px-4 md:px-6">

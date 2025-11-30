@@ -4,8 +4,10 @@ import {
 	Fraunces,
 	Inter,
 	JetBrains_Mono,
+	Playfair_Display,
 	Space_Grotesk,
 } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import { Header } from "@/components/layout/header";
 import "./globals.css";
 
@@ -33,6 +35,12 @@ const jetbrainsMono = JetBrains_Mono({
 	display: "swap",
 });
 
+const playfairDisplay = Playfair_Display({
+	variable: "--font-playfair-display",
+	subsets: ["latin"],
+	display: "swap",
+});
+
 export const metadata: Metadata = {
 	title: "Fitness Tracker",
 	description: "Track your fitness journey",
@@ -47,7 +55,7 @@ export default function RootLayout({
 		<ClerkProvider>
 			<html lang="en">
 				<body
-					className={`${spaceGrotesk.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} antialiased`}
+					className={`${spaceGrotesk.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} ${GeistSans.variable} antialiased`}
 				>
 					<Header />
 					{children}

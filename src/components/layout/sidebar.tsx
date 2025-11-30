@@ -14,7 +14,6 @@ import {
 	X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,7 +63,6 @@ const navigation = [
 ];
 
 export function Sidebar() {
-	const pathname = usePathname();
 	const [isMobileOpen, setIsMobileOpen] = useState(false);
 	const { signOut } = useClerk();
 
@@ -73,19 +71,12 @@ export function Sidebar() {
 	};
 
 	const NavItem = ({ item }: { item: (typeof navigation)[0] }) => {
-		const isActive = pathname === item.href;
-
 		return (
 			<Tooltip delayDuration={0}>
 				<TooltipTrigger asChild>
 					<Link
 						href={item.href}
-						className={cn(
-							"flex items-center justify-center rounded-lg p-3 transition-colors",
-							isActive
-								? "bg-brand-cool/10 text-brand-cool"
-								: "text-secondary-text hover:bg-secondary-surface hover:text-primary-text"
-						)}
+						className="flex items-center justify-center rounded-lg p-3 transition-colors text-secondary-text hover:bg-secondary-surface hover:text-primary-text"
 						aria-label={item.name}
 						onClick={() => setIsMobileOpen(false)}
 					>

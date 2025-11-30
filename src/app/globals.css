@@ -47,6 +47,10 @@
 	--font-mono:
 		var(--font-jetbrains-mono), Menlo, Monaco, Consolas, "Liberation Mono",
 		monospace;
+	--font-display:
+		var(--font-playfair-display), "Playfair Display", Georgia, serif;
+	--font-geist:
+		var(--font-geist-sans), "GeistSans", system-ui, sans-serif;
 }
 
 /* ========================================
@@ -74,6 +78,8 @@
 	--font-primary: var(--font-primary);
 	--font-secondary: var(--font-secondary);
 	--font-accent: var(--font-accent);
+	--font-display: var(--font-display);
+	--font-geist: var(--font-geist);
 }
 
 /* ========================================
@@ -93,4 +99,25 @@ h4,
 h5,
 h6 {
 	font-family: var(--font-primary);
+}
+
+/* ========================================
+   Animated Gradient Text
+   ======================================== */
+
+@keyframes gradient-shift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+.animate-gradient {
+	background-size: 200% 200%;
+	animation: gradient-shift 5s ease infinite;
 }
