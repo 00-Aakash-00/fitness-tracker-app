@@ -69,7 +69,7 @@ export function Sidebar() {
 	const { signOut } = useClerk();
 
 	const handleSignOut = async () => {
-		await signOut({ redirectUrl: "/" });
+		await signOut({ redirectUrl: "/sign-in" });
 	};
 
 	const NavItem = ({ item }: { item: (typeof navigation)[0] }) => {
@@ -127,7 +127,7 @@ export function Sidebar() {
 			{/* Sidebar */}
 			<aside
 				className={cn(
-					"fixed inset-y-0 left-0 z-40 flex w-[72px] flex-col border-r border-border bg-primary-surface transition-transform duration-300 ease-in-out lg:static lg:translate-x-0",
+					"fixed inset-y-0 left-0 z-40 flex w-[72px] flex-col border-r border-border bg-primary-surface transition-transform duration-300 ease-in-out lg:translate-x-0",
 					isMobileOpen ? "translate-x-0" : "-translate-x-full"
 				)}
 			>
