@@ -1,3 +1,4 @@
+import { Footer } from "@/components/layout/footer";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
 
@@ -14,6 +15,7 @@ export default function DashboardLayout({
 				<main className="flex-1 p-6">
 					{children}
 				</main>
+				<Footer />
 			</div>
 		</div>
 	);
