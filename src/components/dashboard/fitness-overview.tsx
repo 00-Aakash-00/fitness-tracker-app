@@ -324,7 +324,7 @@ export function FitnessOverview() {
 								<motion.span
 									layoutId={`value-${active.id}-${id}`}
 									transition={{ type: "spring", stiffness: 300, damping: 30 }}
-									className="font-geist text-5xl font-normal tracking-tighter text-primary-text"
+									className="font-geist text-3xl sm:text-4xl lg:text-5xl font-normal tracking-tighter text-primary-text"
 								>
 									{active.value.toLocaleString()}
 								</motion.span>
@@ -378,7 +378,7 @@ export function FitnessOverview() {
 			)}
 
 			{/* Metric Cards Grid */}
-			<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
 				{metricsData.map((metric) => {
 					const percentage = Math.round((metric.value / metric.goal) * 100);
 					const isActive = active?.id === metric.id;
@@ -415,7 +415,7 @@ export function FitnessOverview() {
 									<motion.span
 										layoutId={`value-${metric.id}-${id}`}
 										transition={{ type: "spring", stiffness: 300, damping: 30 }}
-										className="font-geist text-5xl font-normal tracking-tighter text-primary-text"
+										className="font-geist text-3xl sm:text-4xl lg:text-5xl font-normal tracking-tighter text-primary-text"
 									>
 										{metric.value.toLocaleString()}
 									</motion.span>

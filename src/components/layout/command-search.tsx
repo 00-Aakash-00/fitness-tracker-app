@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 type CommandItem = {
 	label: string;
@@ -79,6 +80,7 @@ export function CommandSearch() {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const router = useRouter();
+	const isMobile = useIsMobile();
 
 	const results = useMemo(() => {
 		if (query.trim() === "") return commands;
@@ -135,18 +137,21 @@ export function CommandSearch() {
 			}
 		};
 		document.addEventListener("mousedown", handleClickOutside);
-		return () =>
+		document.addEventListener("touchstart", handleClickOutside);
+		return () => {
 			document.removeEventListener("mousedown", handleClickOutside);
+			document.removeEventListener("touchstart", handleClickOutside);
+		};
 	}, [open]);
 
 	return (
-		<div className="relative w-full max-w-sm">
+		<div className="relative w-full max-w-[240px] md:max-w-sm">
 			<div className="relative">
 				<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-text" />
 				<Input
 					ref={inputRef}
 					type="search"
-					placeholder="Search or type a command..."
+					placeholder={isMobile ? "Search" : "Search or type a command..."}
 					className="h-9 w-full rounded-full bg-input-bg pl-9 pr-12 text-sm placeholder:text-xs"
 					value={query}
 					onFocus={() => setOpen(true)}

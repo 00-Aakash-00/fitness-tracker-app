@@ -103,7 +103,7 @@ export function FitnessDeviceCarousel({
 			</div>
 
 			{/* Footer Row - Actions + Pagination */}
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				{/* Action Buttons */}
 				<div className="flex items-center gap-2">
 					<button

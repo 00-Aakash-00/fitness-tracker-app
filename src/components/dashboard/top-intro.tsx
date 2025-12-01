@@ -1,9 +1,9 @@
 export function TopIntro() {
 	return (
 		<div className="space-y-4">
-			<div className="font-geist text-[48px] font-medium leading-tight tracking-[-0.2rem] flex flex-col text-primary-text">
+			<div className="font-geist text-[28px] sm:text-[36px] md:text-[48px] font-medium leading-tight tracking-[-0.1rem] md:tracking-[-0.2rem] flex flex-col text-primary-text">
 				<span>Track Your</span>
-				<span className="inline font-geist font-semibold text-[60px] animate-gradient bg-gradient-to-r from-brand-cool via-brand-soft to-brand-cool bg-clip-text text-transparent">
+				<span className="inline font-geist font-semibold text-[32px] sm:text-[44px] md:text-[60px] animate-gradient bg-gradient-to-r from-brand-cool via-brand-soft to-brand-cool bg-clip-text text-transparent">
 					Fitness Journey
 				</span>
 			</div>

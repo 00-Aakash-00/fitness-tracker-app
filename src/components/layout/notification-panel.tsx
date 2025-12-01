@@ -75,8 +75,11 @@ export function NotificationPanel() {
 			}
 		};
 		document.addEventListener("mousedown", handleClickOutside);
-		return () =>
+		document.addEventListener("touchstart", handleClickOutside);
+		return () => {
 			document.removeEventListener("mousedown", handleClickOutside);
+			document.removeEventListener("touchstart", handleClickOutside);
+		};
 	}, [open]);
 
 	// Close on escape
@@ -116,7 +119,7 @@ export function NotificationPanel() {
 			{open && (
 				<div
 					ref={panelRef}
-					className="absolute right-0 z-50 mt-2 w-80 rounded-lg border border-border bg-primary-surface shadow-lg animate-in fade-in-0 zoom-in-95"
+					className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 rounded-lg border border-border bg-primary-surface shadow-lg animate-in fade-in-0 zoom-in-95"
 				>
 					<div className="flex items-center justify-between border-b border-border px-4 py-3">
 						<h3 className="font-primary text-sm font-semibold text-primary-text">

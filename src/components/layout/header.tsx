@@ -19,14 +19,14 @@ export function Header() {
 	}
 
 	return (
-		<header className="flex items-center justify-between border-b border-border bg-primary-surface px-6 py-4">
+		<header className="flex items-center justify-between border-b border-border bg-primary-surface px-4 py-3 md:px-6 md:py-4">
 			<Link
 				href="/"
 				className="font-primary text-xl font-bold text-primary-text"
 			>
 				Fitness Tracker
 			</Link>
-			<nav className="flex items-center gap-4">
+			<nav className="flex items-center gap-2 md:gap-4">
 				<SignedOut>
 					<SignInButton mode="modal">
 						<button
