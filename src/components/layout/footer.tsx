@@ -27,12 +27,6 @@ export function Footer() {
 						>
 							Terms of Service
 						</Link>
-						<Link
-							href="/cookies"
-							className="hover:text-primary-text transition-colors"
-						>
-							Cookie Policy
-						</Link>
 					</div>
 				</div>
 			</div>

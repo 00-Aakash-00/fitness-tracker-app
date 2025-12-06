@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import Image from "next/image";
+import { useState } from "react";
 
 interface FitnessDevice {
 	id: string;

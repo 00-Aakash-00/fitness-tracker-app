@@ -1,22 +1,22 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import {
-	Search,
-	Command as CommandIcon,
-	LayoutDashboard,
-	Dumbbell,
 	Apple,
-	Watch,
-	TrendingUp,
-	Target,
+	Command as CommandIcon,
+	Dumbbell,
+	LayoutDashboard,
+	Search,
 	Settings,
+	Target,
+	TrendingUp,
+	Watch,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { cn } from "@/lib/utils";
 
 type CommandItem = {
 	label: string;
@@ -126,7 +126,7 @@ export function CommandSearch() {
 	// Close on click outside
 	useEffect(() => {
 		if (!open) return;
-		const handleClickOutside = (e: MouseEvent) => {
+		const handleClickOutside = (e: MouseEvent | TouchEvent) => {
 			if (
 				dropdownRef.current &&
 				!dropdownRef.current.contains(e.target as Node) &&
@@ -163,9 +163,7 @@ export function CommandSearch() {
 					onKeyDown={(e) => {
 						if (e.key === "ArrowDown") {
 							e.preventDefault();
-							setHighlightedIndex((h) =>
-								Math.min(h + 1, results.length - 1)
-							);
+							setHighlightedIndex((h) => Math.min(h + 1, results.length - 1));
 						} else if (e.key === "ArrowUp") {
 							e.preventDefault();
 							setHighlightedIndex((h) => Math.max(h - 1, 0));
@@ -225,9 +223,7 @@ export function CommandSearch() {
 									>
 										{item.icon}
 									</span>
-									<span className="truncate font-normal">
-										{item.label}
-									</span>
+									<span className="truncate font-normal">{item.label}</span>
 								</Button>
 							))
 						)}

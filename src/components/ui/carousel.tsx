@@ -1,12 +1,12 @@
 "use client";
 
-import * as React from "react";
 import useEmblaCarousel, {
 	type UseEmblaCarouselType,
 } from "embla-carousel-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type CarouselApi = UseEmblaCarouselType[1];
 type UseCarouselParameters = Parameters<typeof useEmblaCarousel>;
@@ -42,8 +42,8 @@ function useCarousel() {
 }
 
 const Carousel = React.forwardRef<
-	HTMLDivElement,
-	React.HTMLAttributes<HTMLDivElement> & CarouselProps
+	HTMLElement,
+	React.HTMLAttributes<HTMLElement> & CarouselProps
 >(
 	(
 		{
@@ -126,24 +126,23 @@ const Carousel = React.forwardRef<
 					api: api,
 					opts,
 					orientation:
-						orientation ||
-						(opts?.axis === "y" ? "vertical" : "horizontal"),
+						orientation || (opts?.axis === "y" ? "vertical" : "horizontal"),
 					scrollPrev,
 					scrollNext,
 					canScrollPrev,
 					canScrollNext,
 				}}
 			>
-				<div
+				<section
 					ref={ref}
 					onKeyDownCapture={handleKeyDown}
 					className={cn("relative", className)}
-					role="region"
+					aria-label="Image carousel"
 					aria-roledescription="carousel"
 					{...props}
 				>
 					{children}
-				</div>
+				</section>
 			</CarouselContext.Provider>
 		);
 	}
@@ -173,15 +172,14 @@ const CarouselContent = React.forwardRef<
 CarouselContent.displayName = "CarouselContent";
 
 const CarouselItem = React.forwardRef<
-	HTMLDivElement,
-	React.HTMLAttributes<HTMLDivElement>
+	HTMLElement,
+	React.HTMLAttributes<HTMLElement>
 >(({ className, ...props }, ref) => {
 	const { orientation } = useCarousel();
 
 	return (
-		<div
+		<article
 			ref={ref}
-			role="group"
 			aria-roledescription="slide"
 			className={cn(
 				"min-w-0 shrink-0 grow-0 basis-full",

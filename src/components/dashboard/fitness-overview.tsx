@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { Beef, Flame, Footprints, Utensils, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { Flame, Footprints, Utensils, Beef, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useOutsideClick } from "@/hooks/use-outside-click";
 
 // Types
@@ -121,9 +121,9 @@ const metricsData: MetricData[] = [
 function ActivityBreakdown({ items }: { items: ActivityItem[] }) {
 	return (
 		<div className="space-y-3">
-			{items.map((item, index) => (
+			{items.map((item) => (
 				<div
-					key={index}
+					key={`${item.activity}-${item.duration}`}
 					className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
 				>
 					<div className="flex-1">
@@ -133,7 +133,7 @@ function ActivityBreakdown({ items }: { items: ActivityItem[] }) {
 						<p className="text-xs text-secondary-text">{item.duration}</p>
 					</div>
 					<div className="text-right">
-						<p className="font-geist text-lg font-medium text-primary-text">
+						<p className="font-geist text-base sm:text-lg font-medium text-primary-text">
 							{item.calories}
 						</p>
 						<p className="text-xs text-secondary-text">kcal</p>
@@ -149,9 +149,9 @@ function HourlyBreakdown({ items }: { items: HourlyStep[] }) {
 
 	return (
 		<div className="space-y-2">
-			{items.map((item, index) => (
-				<div key={index} className="flex items-center gap-3">
-					<span className="text-xs text-secondary-text w-12 shrink-0">
+			{items.map((item) => (
+				<div key={item.hour} className="flex items-center gap-2 sm:gap-3">
+					<span className="text-xs text-secondary-text w-10 sm:w-12 shrink-0">
 						{item.hour}
 					</span>
 					<div className="flex-1 h-2 bg-border/30 rounded-full overflow-hidden">
@@ -160,7 +160,7 @@ function HourlyBreakdown({ items }: { items: HourlyStep[] }) {
 							style={{ width: `${(item.steps / maxSteps) * 100}%` }}
 						/>
 					</div>
-					<span className="font-geist text-sm font-medium text-primary-text w-14 text-right">
+					<span className="font-geist text-xs sm:text-sm font-medium text-primary-text w-12 sm:w-14 text-right">
 						{item.steps.toLocaleString()}
 					</span>
 				</div>
@@ -172,9 +172,9 @@ function HourlyBreakdown({ items }: { items: HourlyStep[] }) {
 function MealBreakdown({ items }: { items: MealItem[] }) {
 	return (
 		<div className="space-y-3">
-			{items.map((item, index) => (
+			{items.map((item) => (
 				<div
-					key={index}
+					key={`${item.name}-${item.time}`}
 					className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
 				>
 					<div className="flex-1">
@@ -182,7 +182,7 @@ function MealBreakdown({ items }: { items: MealItem[] }) {
 						<p className="text-xs text-secondary-text">{item.time}</p>
 					</div>
 					<div className="text-right">
-						<p className="font-geist text-lg font-medium text-primary-text">
+						<p className="font-geist text-base sm:text-lg font-medium text-primary-text">
 							{item.calories}
 						</p>
 						<p className="text-xs text-secondary-text">kcal</p>
@@ -196,9 +196,9 @@ function MealBreakdown({ items }: { items: MealItem[] }) {
 function ProteinBreakdown({ items }: { items: ProteinSource[] }) {
 	return (
 		<div className="space-y-3">
-			{items.map((item, index) => (
+			{items.map((item) => (
 				<div
-					key={index}
+					key={`${item.name}-${item.time}`}
 					className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
 				>
 					<div className="flex-1">
@@ -206,7 +206,7 @@ function ProteinBreakdown({ items }: { items: ProteinSource[] }) {
 						<p className="text-xs text-secondary-text">{item.time}</p>
 					</div>
 					<div className="text-right">
-						<p className="font-geist text-lg font-medium text-primary-text">
+						<p className="font-geist text-base sm:text-lg font-medium text-primary-text">
 							{item.protein}g
 						</p>
 						<p className="text-xs text-secondary-text">protein</p>
@@ -260,7 +260,7 @@ export function FitnessOverview() {
 		<div className="w-full space-y-6">
 			{/* Header */}
 			<div className="flex items-center justify-between">
-				<h2 className="text-xl tracking-tight font-semibold text-primary-text">
+				<h2 className="text-lg sm:text-xl tracking-tight font-semibold text-primary-text">
 					Today's{" "}
 					<span className="font-accent italic text-brand-cool">Snapshot</span>
 				</h2>
@@ -302,7 +302,7 @@ export function FitnessOverview() {
 						className="w-full max-w-md bg-primary-surface rounded-2xl shadow-xl overflow-hidden border border-border/40"
 					>
 						{/* Card Header */}
-						<div className="p-5 border-b border-border/30">
+						<div className="p-4 sm:p-5 border-b border-border/30">
 							<div className="flex items-start justify-between mb-4">
 								<motion.p
 									layoutId={`title-${active.id}-${id}`}
@@ -328,10 +328,10 @@ export function FitnessOverview() {
 								>
 									{active.value.toLocaleString()}
 								</motion.span>
-								<span className="text-secondary-text/60 text-lg font-light ml-1">
+								<span className="text-secondary-text/60 text-base sm:text-lg font-light ml-1">
 									/
 								</span>
-								<span className="text-secondary-text/60 text-lg font-light">
+								<span className="text-secondary-text/60 text-base sm:text-lg font-light">
 									{active.goal.toLocaleString()}
 								</span>
 								<span className="text-xs text-secondary-text font-light ml-1.5">
@@ -366,7 +366,7 @@ export function FitnessOverview() {
 							initial={{ opacity: 0 }}
 							animate={{ opacity: 1 }}
 							exit={{ opacity: 0 }}
-							className="p-5 max-h-[50vh] overflow-y-auto"
+							className="p-4 sm:p-5 max-h-[50vh] overflow-y-auto"
 						>
 							<p className="text-xs font-medium text-secondary-text uppercase tracking-wider mb-4">
 								Breakdown
@@ -389,11 +389,11 @@ export function FitnessOverview() {
 							layoutId={`card-${metric.id}-${id}`}
 							onClick={() => !isActive && setActive(metric)}
 							transition={{ type: "spring", stiffness: 300, damping: 30 }}
-							className={`p-5 rounded-xl bg-primary-surface border border-border/40 cursor-pointer transition-shadow duration-300 hover:shadow-md group ${isActive ? "opacity-0 pointer-events-none" : ""}`}
+							className={`p-4 sm:p-5 rounded-xl bg-primary-surface border border-border/40 cursor-pointer transition-shadow duration-300 hover:shadow-md group ${isActive ? "opacity-0 pointer-events-none" : ""}`}
 						>
 							<div className="relative">
 								{/* Header */}
-								<div className="flex items-start justify-between mb-4">
+								<div className="flex items-start justify-between mb-3 sm:mb-4">
 									<motion.p
 										layoutId={`title-${metric.id}-${id}`}
 										transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -419,10 +419,10 @@ export function FitnessOverview() {
 									>
 										{metric.value.toLocaleString()}
 									</motion.span>
-									<span className="text-secondary-text/60 text-lg font-light ml-1">
+									<span className="text-secondary-text/60 text-base sm:text-lg font-light ml-1">
 										/
 									</span>
-									<span className="text-secondary-text/60 text-lg font-light">
+									<span className="text-secondary-text/60 text-base sm:text-lg font-light">
 										{metric.goal.toLocaleString()}
 									</span>
 									<span className="text-xs text-secondary-text font-light ml-1.5">

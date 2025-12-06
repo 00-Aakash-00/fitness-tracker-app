@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 import {
 	Fraunces,
@@ -7,7 +8,6 @@ import {
 	Playfair_Display,
 	Space_Grotesk,
 } from "next/font/google";
-import { GeistSans } from "geist/font/sans";
 import { Header } from "@/components/layout/header";
 import "./globals.css";
 

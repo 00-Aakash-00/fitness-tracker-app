@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
 import { Bell, BellDot, Check, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +64,7 @@ export function NotificationPanel() {
 	// Close on click outside
 	useEffect(() => {
 		if (!open) return;
-		const handleClickOutside = (e: MouseEvent) => {
+		const handleClickOutside = (e: MouseEvent | TouchEvent) => {
 			if (
 				panelRef.current &&
 				!panelRef.current.contains(e.target as Node) &&
@@ -152,17 +152,14 @@ export function NotificationPanel() {
 										key={notification.id}
 										className={cn(
 											"group relative px-4 py-3 transition-colors hover:bg-secondary-surface",
-											!notification.read &&
-												"bg-brand-cool/5"
+											!notification.read && "bg-brand-cool/5"
 										)}
 									>
 										<div className="flex items-start gap-3">
 											<div
 												className={cn(
 													"mt-1 h-2 w-2 shrink-0 rounded-full",
-													notification.read
-														? "bg-transparent"
-														: "bg-brand-cool"
+													notification.read ? "bg-transparent" : "bg-brand-cool"
 												)}
 											/>
 											<div className="flex-1 min-w-0">
@@ -182,11 +179,7 @@ export function NotificationPanel() {
 														variant="ghost"
 														size="icon"
 														className="h-6 w-6"
-														onClick={() =>
-															markAsRead(
-																notification.id
-															)
-														}
+														onClick={() => markAsRead(notification.id)}
 													>
 														<Check className="h-3 w-3" />
 													</Button>
@@ -195,11 +188,7 @@ export function NotificationPanel() {
 													variant="ghost"
 													size="icon"
 													className="h-6 w-6 text-secondary-text hover:text-red-500"
-													onClick={() =>
-														removeNotification(
-															notification.id
-														)
-													}
+													onClick={() => removeNotification(notification.id)}
 												>
 													<Trash2 className="h-3 w-3" />
 												</Button>

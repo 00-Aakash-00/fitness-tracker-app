@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { CommandSearch } from "./command-search";
 import { NotificationPanel } from "./notification-panel";
 import { WhatsNewCarousel } from "./whats-new-carousel";
-import { cn } from "@/lib/utils";
 
 function LogoPlaceholder() {
 	return (

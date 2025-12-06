@@ -12,9 +12,7 @@ export default function DashboardLayout({
 			<Sidebar />
 			<div className="flex flex-1 flex-col lg:ml-[72px] bg-secondary-surface">
 				<TopNav />
-				<main className="flex-1 p-4 md:p-6">
-					{children}
-				</main>
+				<main className="flex-1 p-4 md:p-6">{children}</main>
 				<Footer />
 			</div>
 		</div>

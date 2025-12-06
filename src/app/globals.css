@@ -49,8 +49,7 @@
 		monospace;
 	--font-display:
 		var(--font-playfair-display), "Playfair Display", Georgia, serif;
-	--font-geist:
-		var(--font-geist-sans), "GeistSans", system-ui, sans-serif;
+	--font-geist: var(--font-geist-sans), "GeistSans", system-ui, sans-serif;
 }
 
 /* ========================================
@@ -120,4 +119,72 @@ h6 {
 .animate-gradient {
 	background-size: 200% 200%;
 	animation: gradient-shift 5s ease infinite;
+}
+
+/* ========================================
+   Print Styles for Legal Pages
+   Using high specificity selectors to override without !important
+   ======================================== */
+
+@media print {
+	/* Hide non-essential elements - high specificity */
+	html body .print\:hidden,
+	html body header:not(.legal-header),
+	html body nav,
+	html body button,
+	html body .legal-sidebar,
+	html body aside {
+		display: none;
+		visibility: hidden;
+	}
+
+	/* Reset backgrounds for printing - high specificity */
+	html body,
+	html body main,
+	html body div {
+		background: white;
+		background-color: white;
+	}
+
+	html body,
+	html body main,
+	html body div,
+	html body p,
+	html body span {
+		color: black;
+	}
+
+	/* Full width content - high specificity */
+	html body .print\:max-w-none {
+		max-width: 100%;
+		width: 100%;
+	}
+
+	/* Remove margins and padding for print - high specificity */
+	html body .print\:px-0 {
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	html body .print\:py-0 {
+		padding-top: 0;
+		padding-bottom: 0;
+	}
+
+	/* Ensure links show URLs */
+	a[href^="http"]:after {
+		content: " (" attr(href) ")";
+		font-size: 0.8em;
+		color: #666;
+	}
+
+	/* Prevent page breaks inside sections */
+	section {
+		page-break-inside: avoid;
+	}
+
+	/* Page margins */
+	@page {
+		margin: 2cm;
+	}
 }
