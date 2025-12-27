@@ -52,7 +52,13 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<ClerkProvider>
+		<ClerkProvider
+			signInUrl="/sign-in"
+			signUpUrl="/sign-up"
+			signInFallbackRedirectUrl="/dashboard"
+			signUpFallbackRedirectUrl="/dashboard"
+			afterSignOutUrl="/sign-in"
+		>
 			<html lang="en">
 				<body
 					className={`${spaceGrotesk.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} ${GeistSans.variable} antialiased`}

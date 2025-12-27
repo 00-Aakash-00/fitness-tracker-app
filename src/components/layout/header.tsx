@@ -9,12 +9,18 @@ import {
 } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 export function Header() {
 	const pathname = usePathname();
 
+	const shouldHideHeader =
+		pathname.startsWith("/dashboard") ||
+		pathname.startsWith("/sign-in") ||
+		pathname.startsWith("/sign-up");
+
 	// Hide header on dashboard pages (sidebar handles navigation there)
-	if (pathname.startsWith("/dashboard")) {
+	if (shouldHideHeader) {
 		return null;
 	}
 
@@ -28,21 +34,15 @@ export function Header() {
 			</Link>
 			<nav className="flex items-center gap-2 md:gap-4">
 				<SignedOut>
-					<SignInButton mode="modal">
-						<button
-							type="button"
-							className="rounded-lg border border-border bg-primary-surface px-4 py-2 font-primary text-sm font-medium text-primary-text transition-colors hover:bg-secondary-surface"
-						>
+					<SignInButton mode="redirect">
+						<Button type="button" variant="outline" size="default">
 							Sign In
-						</button>
+						</Button>
 					</SignInButton>
-					<SignUpButton mode="modal">
-						<button
-							type="button"
-							className="rounded-lg bg-brand-cool px-4 py-2 font-primary text-sm font-medium text-white transition-colors hover:bg-brand-deep"
-						>
+					<SignUpButton mode="redirect">
+						<Button type="button" size="default">
 							Sign Up
-						</button>
+						</Button>
 					</SignUpButton>
 				</SignedOut>
 				<SignedIn>

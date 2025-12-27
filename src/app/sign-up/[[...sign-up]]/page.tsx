@@ -1,20 +1,21 @@
 import { SignUp } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { clerkAuthAppearance } from "@/lib/clerk-appearance";
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+	const { userId } = await auth();
+
+	if (userId) {
+		redirect("/dashboard");
+	}
+
 	return (
-		<main className="flex min-h-[calc(100vh-73px)] items-center justify-center bg-secondary-surface p-8">
+		<main className="flex min-h-screen items-center justify-center bg-secondary-surface p-8">
 			<SignUp
-				appearance={{
-					elements: {
-						rootBox: "mx-auto",
-						card: "shadow-lg",
-						headerTitle: "font-primary",
-						headerSubtitle: "font-secondary text-secondary-text",
-						formButtonPrimary:
-							"bg-brand-cool hover:bg-brand-deep transition-colors",
-						footerActionLink: "text-brand-cool hover:text-brand-deep",
-					},
-				}}
+				appearance={clerkAuthAppearance}
+				signInUrl="/sign-in"
+				fallbackRedirectUrl="/dashboard"
 			/>
 		</main>
 	);
