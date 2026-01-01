@@ -2,20 +2,13 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
+import { AppLogo } from "@/components/layout/app-logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { CommandSearch } from "./command-search";
 import { NotificationPanel } from "./notification-panel";
 import { WhatsNewCarousel } from "./whats-new-carousel";
-
-function LogoPlaceholder() {
-	return (
-		<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-cool">
-			<span className="font-primary text-sm font-bold text-white">FT</span>
-		</div>
-	);
-}
 
 function UserAvatar() {
 	const { user, isLoaded } = useUser();
@@ -90,7 +83,7 @@ export function TopNav() {
 			<div className="flex h-full items-center justify-between px-4 md:px-6">
 				{/* Left section: Logo + What's New */}
 				<div className="flex items-center gap-4">
-					<LogoPlaceholder />
+					<AppLogo href="/dashboard" priority />
 					<WhatsNewCarousel />
 				</div>
 

@@ -9,6 +9,7 @@ import {
 } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AppLogo } from "@/components/layout/app-logo";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
@@ -26,12 +27,7 @@ export function Header() {
 
 	return (
 		<header className="flex items-center justify-between border-b border-border bg-primary-surface px-4 py-3 md:px-6 md:py-4">
-			<Link
-				href="/"
-				className="font-primary text-xl font-bold text-primary-text"
-			>
-				Fitness Tracker
-			</Link>
+			<AppLogo href="/" priority />
 			<nav className="flex items-center gap-2 md:gap-4">
 				<SignedOut>
 					<SignInButton mode="redirect">

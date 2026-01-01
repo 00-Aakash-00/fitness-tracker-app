@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { AppLogo } from "@/components/layout/app-logo";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -175,9 +176,7 @@ export function Sidebar() {
 			>
 				{/* Mobile Header */}
 				<div className="flex items-center justify-between p-4 border-b border-border">
-					<span className="font-primary text-lg font-semibold text-primary-text">
-						Fitness Tracker
-					</span>
+					<AppLogo href="/dashboard" onClick={() => setIsMobileOpen(false)} />
 					<Button
 						variant="ghost"
 						size="icon"
