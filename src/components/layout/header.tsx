@@ -12,7 +12,9 @@ export function Header() {
 	const shouldHideHeader =
 		pathname.startsWith("/dashboard") ||
 		pathname.startsWith("/sign-in") ||
-		pathname.startsWith("/sign-up");
+		pathname.startsWith("/sign-up") ||
+		pathname.startsWith("/privacy") ||
+		pathname.startsWith("/terms");
 
 	// Hide header on dashboard pages (sidebar handles navigation there)
 	if (shouldHideHeader) {
@@ -20,7 +22,10 @@ export function Header() {
 	}
 
 	return (
-		<header className="flex items-center justify-between border-b border-border bg-primary-surface px-4 py-3 md:px-6 md:py-4">
+		<header
+			data-app-header="true"
+			className="flex items-center justify-between border-b border-border bg-primary-surface px-4 py-3 md:px-6 md:py-4"
+		>
 			<AppLogo href="/" priority />
 			<nav className="flex items-center gap-2 md:gap-4">
 				<SignedOut>
