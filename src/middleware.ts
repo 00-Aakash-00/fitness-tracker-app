@@ -9,19 +9,25 @@ const isPublicRoute = createRouteMatcher([
 	"/privacy",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
-	const { userId } = await auth();
+export default clerkMiddleware(
+	async (auth, request) => {
+		const { userId } = await auth();
 
-	// Redirect root path based on auth status
-	if (request.nextUrl.pathname === "/") {
-		const redirectUrl = userId ? "/dashboard" : "/sign-in";
-		return NextResponse.redirect(new URL(redirectUrl, request.url));
-	}
+		// Redirect root path based on auth status
+		if (request.nextUrl.pathname === "/") {
+			const redirectUrl = userId ? "/dashboard" : "/sign-in";
+			return NextResponse.redirect(new URL(redirectUrl, request.url));
+		}
 
-	if (!isPublicRoute(request)) {
-		await auth.protect();
+		if (!isPublicRoute(request)) {
+			await auth.protect();
+		}
+	},
+	{
+		signInUrl: "/sign-in",
+		signUpUrl: "/sign-up",
 	}
-});
+);
 
 export const config = {
 	matcher: [

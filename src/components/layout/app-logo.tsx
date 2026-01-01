@@ -8,6 +8,7 @@ interface AppLogoProps {
 	href?: string;
 	className?: string;
 	imageClassName?: string;
+	sizes?: string;
 	priority?: boolean;
 	onClick?: MouseEventHandler<HTMLAnchorElement>;
 }
@@ -16,6 +17,7 @@ export function AppLogo({
 	href = "/",
 	className,
 	imageClassName,
+	sizes = "48px",
 	priority = false,
 	onClick,
 }: AppLogoProps) {
@@ -34,7 +36,7 @@ export function AppLogo({
 				src="/logo.png"
 				alt="Fitness Tracker"
 				fill
-				sizes="48px"
+				sizes={sizes}
 				className={cn("object-contain", imageClassName)}
 				priority={priority}
 			/>

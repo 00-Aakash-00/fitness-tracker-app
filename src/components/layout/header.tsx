@@ -1,12 +1,6 @@
 "use client";
 
-import {
-	SignedIn,
-	SignedOut,
-	SignInButton,
-	SignUpButton,
-	UserButton,
-} from "@clerk/nextjs";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppLogo } from "@/components/layout/app-logo";
@@ -30,16 +24,12 @@ export function Header() {
 			<AppLogo href="/" priority />
 			<nav className="flex items-center gap-2 md:gap-4">
 				<SignedOut>
-					<SignInButton mode="redirect">
-						<Button type="button" variant="outline" size="default">
-							Sign In
-						</Button>
-					</SignInButton>
-					<SignUpButton mode="redirect">
-						<Button type="button" size="default">
-							Sign Up
-						</Button>
-					</SignUpButton>
+					<Button asChild variant="outline" size="default">
+						<Link href="/sign-in">Sign In</Link>
+					</Button>
+					<Button asChild size="default">
+						<Link href="/sign-up">Sign Up</Link>
+					</Button>
 				</SignedOut>
 				<SignedIn>
 					<Link
