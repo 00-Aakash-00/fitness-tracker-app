@@ -11,24 +11,32 @@ export const AnimatedShinyText: FC<AnimatedShinyTextProps> = ({
 	children,
 	className,
 	shimmerWidth = 100,
+	style,
 	...props
 }) => {
 	return (
 		<span
 			style={
 				{
+					...style,
 					"--shiny-width": `${shimmerWidth}px`,
 				} as CSSProperties
 			}
-			className={cn(
-				"mx-auto max-w-md text-neutral-600/70 dark:text-neutral-400/70",
-				"animate-shiny-text [background-size:var(--shiny-width)_100%] bg-clip-text [background-position:0_0] bg-no-repeat [transition:background-position_1s_cubic-bezier(.6,.6,0,1)_infinite]",
-				"bg-gradient-to-r from-transparent via-black/80 via-50% to-transparent dark:via-white/80",
-				className
-			)}
+			className={cn("relative inline-block", className)}
 			{...props}
 		>
-			{children}
+			<span className="relative z-10">{children}</span>
+			<span
+				aria-hidden="true"
+				className={cn(
+					"pointer-events-none absolute inset-0 z-20",
+					"text-transparent [-webkit-text-fill-color:transparent] bg-clip-text",
+					"animate-shiny-text [background-size:var(--shiny-width)_100%] [background-position:0_0] bg-no-repeat",
+					"bg-gradient-to-r from-transparent via-white/80 via-50% to-transparent dark:via-white/80"
+				)}
+			>
+				{children}
+			</span>
 		</span>
 	);
 };
