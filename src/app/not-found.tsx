@@ -11,7 +11,7 @@ export default function NotFound() {
 			</style>
 			<main className="flex min-h-screen items-center justify-center bg-secondary-surface p-8">
 				<div className="flex w-full max-w-[520px] flex-col items-center gap-6 text-center">
-					<AppLogo href="/" className="h-16 w-24" sizes="96px" priority />
+					<AppLogo href="/" className="h-20 w-[120px]" sizes="120px" priority />
 					<div className="space-y-2">
 						<h1 className="font-primary text-3xl font-bold text-primary-text">
 							Page not found

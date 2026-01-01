@@ -52,7 +52,7 @@ export function LegalLayout({
 				>
 					<Menu className="h-5 w-5" />
 				</Button>
-				<AppLogo href="/" className="h-7 w-[42px]" />
+				<AppLogo href="/" className="h-[35px] w-[52.5px]" sizes="53px" />
 				<div className="w-9" /> {/* Spacer for centering */}
 			</header>
 
@@ -78,7 +78,7 @@ export function LegalLayout({
 					<div className="sticky top-0 h-screen border-r border-border">
 						{/* Desktop Logo */}
 						<div className="flex items-center h-14 px-4 border-b border-border">
-							<AppLogo href="/" className="h-7 w-[42px]" />
+							<AppLogo href="/" className="h-[35px] w-[52.5px]" sizes="53px" />
 						</div>
 						<div className="h-[calc(100vh-3.5rem)] overflow-hidden">
 							<LegalSidebar

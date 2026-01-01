@@ -17,7 +17,7 @@ export function AppLogo({
 	href = "/",
 	className,
 	imageClassName,
-	sizes = "48px",
+	sizes = "60px",
 	priority = false,
 	onClick,
 }: AppLogoProps) {
@@ -27,7 +27,7 @@ export function AppLogo({
 			aria-label="Home"
 			onClick={onClick}
 			className={cn(
-				"relative inline-flex h-8 w-12 shrink-0 items-center justify-center",
+				"relative inline-flex h-10 w-[60px] shrink-0 items-center justify-center",
 				"transition-opacity hover:opacity-90",
 				className
 			)}
