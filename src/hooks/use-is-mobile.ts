@@ -1,19 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const MOBILE_BREAKPOINT = 768; // Aligns with Tailwind md:
 
 export function useIsMobile(): boolean {
-	const [isMobile, setIsMobile] = useState(false); // SSR-safe default
+	const query = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
 
-	useEffect(() => {
-		const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
-		setIsMobile(mq.matches);
-		const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-		mq.addEventListener("change", handler);
-		return () => mq.removeEventListener("change", handler);
-	}, []);
+	const isMobile = useSyncExternalStore(
+		(onStoreChange) => {
+			const mq = window.matchMedia(query);
+			const handler = () => onStoreChange();
+			mq.addEventListener("change", handler);
+			return () => mq.removeEventListener("change", handler);
+		},
+		() => window.matchMedia(query).matches,
+		() => false
+	);
 
 	return isMobile;
 }

@@ -1,3 +1,5 @@
+/* eslint-disable react/no-unescaped-entities */
+
 import type { LegalDocument } from "@/types/legal";
 
 export const privacyContent: LegalDocument = {

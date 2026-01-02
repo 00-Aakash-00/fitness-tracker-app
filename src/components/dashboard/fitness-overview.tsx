@@ -261,7 +261,7 @@ export function FitnessOverview() {
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg sm:text-xl tracking-tight font-semibold text-primary-text">
-					Today's{" "}
+					Today&apos;s{" "}
 					<span className="font-accent italic text-brand-cool">Snapshot</span>
 				</h2>
 				<p className="text-xs text-secondary-text font-light">
