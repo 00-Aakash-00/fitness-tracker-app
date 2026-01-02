@@ -1,9 +1,14 @@
+import { cookies } from "next/headers";
 import { FitnessDeviceCarousel } from "@/components/dashboard/fitness-device-carousel";
 import { FitnessOverview } from "@/components/dashboard/fitness-overview";
 import { QuickAssist } from "@/components/dashboard/quick-assist";
 import { TopIntro } from "@/components/dashboard/top-intro";
+import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+	const cookieStore = await cookies();
+	const stepGoal = parseStepGoal(cookieStore.get(STEP_GOAL_COOKIE)?.value);
+
 	return (
 		<div className="min-h-[calc(100vh-4rem)]">
 			{/* Top Row - Main Content */}
@@ -19,7 +24,7 @@ export default function DashboardPage() {
 
 				{/* Right Panel - 2/3 */}
 				<div className="flex-1 py-2 flex items-start pt-14">
-					<FitnessOverview />
+					<FitnessOverview stepGoal={stepGoal} />
 				</div>
 			</div>
 

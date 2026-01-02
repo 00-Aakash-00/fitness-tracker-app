@@ -2,7 +2,7 @@
 
 import { Beef, Flame, Footprints, Utensils, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useOutsideClick } from "@/hooks/use-outside-click";
 
 // Types
@@ -232,10 +232,17 @@ function BreakdownContent({ metric }: { metric: MetricData }) {
 	}
 }
 
-export function FitnessOverview() {
+export function FitnessOverview({ stepGoal }: { stepGoal?: number }) {
 	const [active, setActive] = useState<MetricData | null>(null);
 	const ref = useRef<HTMLDivElement>(null);
 	const id = useId();
+
+	const metrics = useMemo(() => {
+		if (!stepGoal) return metricsData;
+		return metricsData.map((metric) =>
+			metric.id === "steps" ? { ...metric, goal: stepGoal } : metric
+		);
+	}, [stepGoal]);
 
 	useEffect(() => {
 		function onKeyDown(event: KeyboardEvent) {
@@ -379,7 +386,7 @@ export function FitnessOverview() {
 
 			{/* Metric Cards Grid */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-				{metricsData.map((metric) => {
+				{metrics.map((metric) => {
 					const percentage = Math.round((metric.value / metric.goal) * 100);
 					const isActive = active?.id === metric.id;
 
