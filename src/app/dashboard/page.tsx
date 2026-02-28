@@ -3,11 +3,37 @@ import { FitnessDeviceCarousel } from "@/components/dashboard/fitness-device-car
 import { FitnessOverview } from "@/components/dashboard/fitness-overview";
 import { QuickAssist } from "@/components/dashboard/quick-assist";
 import { TopIntro } from "@/components/dashboard/top-intro";
+import { isOuraConfigured } from "@/lib/integrations/oura.server";
+import { isWhoopConfigured } from "@/lib/integrations/whoop.server";
 import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
 
 export default async function DashboardPage() {
 	const cookieStore = await cookies();
 	const stepGoal = parseStepGoal(cookieStore.get(STEP_GOAL_COOKIE)?.value);
+	const devices = [
+		...(isWhoopConfigured()
+			? [
+					{
+						id: "whoop",
+						type: "whoop" as const,
+						deviceName: "WHOOP",
+						status: "offline" as const,
+						image: "/whoop.png",
+					},
+				]
+			: []),
+		...(isOuraConfigured()
+			? [
+					{
+						id: "oura",
+						type: "oura" as const,
+						deviceName: "Oura",
+						status: "offline" as const,
+						image: "/oura.png",
+					},
+				]
+			: []),
+	];
 
 	return (
 		<div className="min-h-[calc(100vh-4rem)]">
@@ -31,7 +57,7 @@ export default async function DashboardPage() {
 			{/* Bottom Row - Carousel aligned right */}
 			<div className="flex justify-end mt-8">
 				<div className="w-full lg:w-1/3">
-					<FitnessDeviceCarousel />
+					<FitnessDeviceCarousel devices={devices} />
 				</div>
 			</div>
 		</div>
