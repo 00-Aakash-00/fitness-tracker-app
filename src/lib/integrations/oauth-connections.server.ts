@@ -33,7 +33,36 @@ export async function getSupabaseUserIdByClerkId(
 	}
 
 	if (!data?.id) {
-		throw new Error("User not found in Supabase. Wait a moment and try again.");
+		// Webhook provisioning can lag or be misconfigured; create the user row on-demand
+		// so first-time flows (like OAuth connect) still work.
+		const { data: created, error: createError } = await supabase
+			.from("users")
+			.insert({ clerk_id: clerkUserId })
+			.select("id")
+			.single();
+
+		if (createError) {
+			// If another request/webhook created the row concurrently, re-read it.
+			const isUniqueViolation =
+				typeof (createError as { code?: string }).code === "string" &&
+				(createError as { code?: string }).code === "23505";
+			if (!isUniqueViolation) {
+				throw createError;
+			}
+
+			const { data: existing, error: rereadError } = await supabase
+				.from("users")
+				.select("id")
+				.eq("clerk_id", clerkUserId)
+				.maybeSingle();
+			if (rereadError) throw rereadError;
+			if (!existing?.id) {
+				throw new Error("User not found in Supabase. Please try again.");
+			}
+			return existing.id;
+		}
+
+		return created.id;
 	}
 
 	return data.id;

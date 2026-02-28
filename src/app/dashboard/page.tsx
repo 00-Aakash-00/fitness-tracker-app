@@ -3,6 +3,7 @@ import { FitnessDeviceCarousel } from "@/components/dashboard/fitness-device-car
 import { FitnessOverview } from "@/components/dashboard/fitness-overview";
 import { QuickAssist } from "@/components/dashboard/quick-assist";
 import { TopIntro } from "@/components/dashboard/top-intro";
+import { WeeklyActivitySummary } from "@/components/dashboard/weekly-activity-summary";
 import { isOuraConfigured } from "@/lib/integrations/oura.server";
 import { isWhoopConfigured } from "@/lib/integrations/whoop.server";
 import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
 				{/* Left Panel - 1/3 */}
 				<div className="w-full lg:w-1/3 flex flex-col gap-8 pt-8">
 					<TopIntro />
+					<WeeklyActivitySummary />
 					<QuickAssist />
 				</div>
 
@@ -55,7 +57,7 @@ export default async function DashboardPage() {
 			</div>
 
 			{/* Bottom Row - Carousel aligned right */}
-			<div className="flex justify-end mt-8">
+			<div className="flex justify-end mt-14">
 				<div className="w-full lg:w-1/3">
 					<FitnessDeviceCarousel devices={devices} />
 				</div>
