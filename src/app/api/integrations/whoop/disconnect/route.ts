@@ -10,11 +10,8 @@ import {
 	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
 } from "@/lib/integrations/oauth-connections.server";
-import {
-	isExpiringSoon,
-	refreshWhoopTokens,
-	revokeWhoopAccess,
-} from "@/lib/integrations/whoop.server";
+import { revokeWhoopAccess } from "@/lib/integrations/whoop.server";
+import { getValidWhoopAccessToken } from "@/lib/integrations/whoop-connection.server";
 
 export async function POST(request: NextRequest) {
 	const origin = getRequestOrigin(request);
@@ -39,18 +36,11 @@ export async function POST(request: NextRequest) {
 		});
 
 		if (connection) {
-			const accessToken = connection.access_token;
-			const refreshToken = connection.refresh_token;
-
 			try {
-				if (!isExpiringSoon(connection.access_token_expires_at, 0)) {
-					await revokeWhoopAccess(accessToken);
-				} else if (refreshToken) {
-					const refreshed = await refreshWhoopTokens({ refreshToken });
-					await revokeWhoopAccess(refreshed.access_token);
-				} else {
-					await revokeWhoopAccess(accessToken);
-				}
+				const accessToken = await getValidWhoopAccessToken({
+					supabaseUserId,
+				});
+				await revokeWhoopAccess(accessToken);
 			} catch {
 				// Best-effort revoke; still disconnect locally.
 			}

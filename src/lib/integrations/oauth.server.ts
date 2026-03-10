@@ -17,6 +17,18 @@ export const OAUTH_STATE_COOKIE_NAME: Record<OAuthProvider, string> = {
 	oura: "__ft_oura_oauth_state",
 };
 
+export function getConfiguredAppOrigin(): string | null {
+	const raw = process.env.APP_URL?.trim();
+	if (!raw) return null;
+
+	const url = new URL(raw);
+	return url.origin;
+}
+
+export function getCanonicalAppOrigin(request: NextRequest): string {
+	return getConfiguredAppOrigin() ?? getRequestOrigin(request);
+}
+
 export function getRequestOrigin(request: NextRequest): string {
 	const firstHeaderValue = (value: string | null) =>
 		value?.split(",")[0]?.trim() || null;

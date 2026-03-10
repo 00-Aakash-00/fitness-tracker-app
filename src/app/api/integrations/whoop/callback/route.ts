@@ -3,18 +3,21 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
 	decodeCookiePayload,
-	getRequestOrigin,
+	getCanonicalAppOrigin,
 	OAUTH_STATE_COOKIE_NAME,
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
 	getSupabaseUserIdByClerkId,
+	isOAuthConnectionProviderUserConflict,
 	upsertOAuthConnection,
 } from "@/lib/integrations/oauth-connections.server";
 import {
+	buildWhoopCallbackUrl,
 	exchangeWhoopCodeForTokens,
 	fetchWhoopBasicProfile,
 	getExpiresAtFromExpiresIn,
+	getWhoopAuthorizationErrorMessage,
 } from "@/lib/integrations/whoop.server";
 
 const WHOOP_STATE_COOKIE_PATH = "/api/integrations/whoop/callback";
@@ -55,7 +58,7 @@ function redirectToDevicesWithStateReset(params: {
 }
 
 export async function GET(request: NextRequest) {
-	const origin = getRequestOrigin(request);
+	const origin = getCanonicalAppOrigin(request);
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.redirect(new URL("/sign-in", request.url));
@@ -76,7 +79,10 @@ export async function GET(request: NextRequest) {
 				origin,
 				returnTo,
 				status: "error",
-				message: errorDescription ? `${error}: ${errorDescription}` : error,
+				message: getWhoopAuthorizationErrorMessage({
+					error,
+					errorDescription,
+				}),
 			});
 		}
 
@@ -92,7 +98,7 @@ export async function GET(request: NextRequest) {
 			});
 		}
 
-		const expectedRedirectUri = `${origin}${WHOOP_STATE_COOKIE_PATH}`;
+		const expectedRedirectUri = buildWhoopCallbackUrl(origin);
 		if (cookiePayload.redirectUri !== expectedRedirectUri) {
 			return redirectToDevicesWithStateReset({
 				origin,
@@ -137,16 +143,30 @@ export async function GET(request: NextRequest) {
 		const profile = await fetchWhoopBasicProfile(token.access_token);
 		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 
-		await upsertOAuthConnection({
-			userId: supabaseUserId,
-			provider: "whoop",
-			providerUserId: String(profile.user_id),
-			accessToken: token.access_token,
-			refreshToken: token.refresh_token ?? null,
-			tokenType: token.token_type ?? null,
-			scope: token.scope ?? null,
-			accessTokenExpiresAt: getExpiresAtFromExpiresIn(token.expires_in),
-		});
+		try {
+			await upsertOAuthConnection({
+				userId: supabaseUserId,
+				provider: "whoop",
+				providerUserId: String(profile.user_id),
+				accessToken: token.access_token,
+				refreshToken: token.refresh_token ?? null,
+				tokenType: token.token_type ?? null,
+				scope: token.scope ?? null,
+				accessTokenExpiresAt: getExpiresAtFromExpiresIn(token.expires_in),
+			});
+		} catch (error) {
+			if (isOAuthConnectionProviderUserConflict(error)) {
+				return redirectToDevicesWithStateReset({
+					origin,
+					returnTo,
+					status: "error",
+					message:
+						"This WHOOP account is already connected to another IAM360 account.",
+				});
+			}
+
+			throw error;
+		}
 
 		const response = redirectToDevices({
 			origin,

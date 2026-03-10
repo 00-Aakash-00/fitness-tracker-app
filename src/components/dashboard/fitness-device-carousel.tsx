@@ -58,7 +58,8 @@ export function FitnessDeviceCarousel({
 					</h2>
 				</div>
 				<p className="rounded-lg border border-border/40 bg-secondary-surface/40 p-3 text-sm text-secondary-text">
-					WHOOP and Oura integrations are coming soon.
+					Connect an available device from the Devices page to start syncing
+					data.
 				</p>
 			</div>
 		);

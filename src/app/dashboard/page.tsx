@@ -1,40 +1,65 @@
+import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { FitnessDeviceCarousel } from "@/components/dashboard/fitness-device-carousel";
 import { FitnessOverview } from "@/components/dashboard/fitness-overview";
 import { QuickAssist } from "@/components/dashboard/quick-assist";
 import { TopIntro } from "@/components/dashboard/top-intro";
 import { WeeklyActivitySummary } from "@/components/dashboard/weekly-activity-summary";
+import {
+	getOAuthConnection,
+	getSupabaseUserIdByClerkId,
+} from "@/lib/integrations/oauth-connections.server";
 import { isOuraConfigured } from "@/lib/integrations/oura.server";
 import { isWhoopConfigured } from "@/lib/integrations/whoop.server";
 import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
 
 export default async function DashboardPage() {
-	const cookieStore = await cookies();
+	const [{ userId }, cookieStore] = await Promise.all([auth(), cookies()]);
 	const stepGoal = parseStepGoal(cookieStore.get(STEP_GOAL_COOKIE)?.value);
-	const devices = [
-		...(isWhoopConfigured()
-			? [
-					{
-						id: "whoop",
-						type: "whoop" as const,
-						deviceName: "WHOOP",
-						status: "offline" as const,
-						image: "/whoop.png",
-					},
-				]
-			: []),
-		...(isOuraConfigured()
-			? [
-					{
-						id: "oura",
-						type: "oura" as const,
-						deviceName: "Oura",
-						status: "offline" as const,
-						image: "/oura.png",
-					},
-				]
-			: []),
-	];
+	const isWhoopAvailable = isWhoopConfigured();
+	const isOuraAvailable = isOuraConfigured();
+	let devices: Parameters<typeof FitnessDeviceCarousel>[0]["devices"] = [];
+
+	if (userId && (isWhoopAvailable || isOuraAvailable)) {
+		try {
+			const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+			const [whoopConnection, ouraConnection] = await Promise.all([
+				isWhoopAvailable
+					? getOAuthConnection({ userId: supabaseUserId, provider: "whoop" })
+					: Promise.resolve(null),
+				isOuraAvailable
+					? getOAuthConnection({ userId: supabaseUserId, provider: "oura" })
+					: Promise.resolve(null),
+			]);
+
+			devices = [
+				...(whoopConnection
+					? [
+							{
+								id: "whoop",
+								type: "whoop" as const,
+								deviceName: "WHOOP",
+								status: "connected" as const,
+								image: "/whoop.png",
+							},
+						]
+					: []),
+				...(ouraConnection
+					? [
+							{
+								id: "oura",
+								type: "oura" as const,
+								deviceName: "Oura",
+								status: "connected" as const,
+								image: "/oura.png",
+							},
+						]
+					: []),
+			];
+		} catch {
+			devices = [];
+		}
+	}
 
 	return (
 		<div className="min-h-[calc(100vh-4rem)]">

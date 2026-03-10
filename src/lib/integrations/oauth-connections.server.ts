@@ -18,6 +18,12 @@ export type OAuthConnectionRow = {
 	updated_at: string | null;
 };
 
+type MaybePostgrestError = {
+	code?: string;
+	constraint?: string;
+	message?: string;
+};
+
 export async function getSupabaseUserIdByClerkId(
 	clerkUserId: string
 ): Promise<string> {
@@ -101,6 +107,53 @@ export async function upsertOAuthConnection(params: {
 	}
 }
 
+export async function rotateOAuthConnectionTokens(params: {
+	userId: string;
+	provider: OAuthProvider;
+	previousRefreshToken: string;
+	providerUserId?: string | null;
+	accessToken: string;
+	refreshToken?: string | null;
+	tokenType?: string | null;
+	scope?: string | null;
+	accessTokenExpiresAt?: string | null;
+	refreshTokenExpiresAt?: string | null;
+}): Promise<"updated" | "stale" | "missing"> {
+	const supabase = createAdminClient();
+
+	const { data, error } = await supabase
+		.from("oauth_connections")
+		.update({
+			provider_user_id: params.providerUserId ?? null,
+			access_token: params.accessToken,
+			refresh_token: params.refreshToken ?? null,
+			token_type: params.tokenType ?? null,
+			scope: params.scope ?? null,
+			access_token_expires_at: params.accessTokenExpiresAt ?? null,
+			refresh_token_expires_at: params.refreshTokenExpiresAt ?? null,
+		})
+		.eq("user_id", params.userId)
+		.eq("provider", params.provider)
+		.eq("refresh_token", params.previousRefreshToken)
+		.select("id")
+		.maybeSingle();
+
+	if (error) {
+		throw error;
+	}
+
+	if (data?.id) {
+		return "updated";
+	}
+
+	const latest = await getOAuthConnection({
+		userId: params.userId,
+		provider: params.provider,
+	});
+
+	return latest ? "stale" : "missing";
+}
+
 export async function getOAuthConnection(params: {
 	userId: string;
 	provider: OAuthProvider;
@@ -129,4 +182,19 @@ export async function deleteOAuthConnection(params: {
 		.eq("provider", params.provider);
 
 	if (error) throw error;
+}
+
+export function isOAuthConnectionProviderUserConflict(error: unknown): boolean {
+	const candidate = error as MaybePostgrestError | null;
+	if (!candidate || candidate.code !== "23505") {
+		return false;
+	}
+
+	return (
+		candidate.constraint ===
+			"oauth_connections_provider_provider_user_id_key" ||
+		candidate.message?.includes(
+			"oauth_connections_provider_provider_user_id_key"
+		) === true
+	);
 }

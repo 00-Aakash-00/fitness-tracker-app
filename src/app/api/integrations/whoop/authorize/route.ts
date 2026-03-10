@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import {
 	encodeCookiePayload,
 	generateState,
-	getRequestOrigin,
+	getCanonicalAppOrigin,
 	getReturnToPath,
 	OAUTH_STATE_COOKIE_NAME,
 	type OAuthStateCookiePayload,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/integrations/oauth.server";
 import {
 	buildWhoopAuthorizeUrl,
+	buildWhoopCallbackUrl,
 	getWhoopScopes,
 	isWhoopConfigured,
 } from "@/lib/integrations/whoop.server";
@@ -22,9 +23,9 @@ export async function GET(request: NextRequest) {
 		return NextResponse.redirect(new URL("/sign-in", request.url));
 	}
 
-	const origin = getRequestOrigin(request);
+	const origin = getCanonicalAppOrigin(request);
 	const returnTo = getReturnToPath(request) ?? "/dashboard/devices";
-	const redirectUri = `${origin}/api/integrations/whoop/callback`;
+	const redirectUri = buildWhoopCallbackUrl(origin);
 
 	if (!isWhoopConfigured()) {
 		const url = new URL(returnTo, origin);
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
 	}
 
 	try {
-		const state = generateState(32);
+		const state = generateState(8);
 		const scope = getWhoopScopes();
 		const authorizeUrl = buildWhoopAuthorizeUrl({ redirectUri, state, scope });
 

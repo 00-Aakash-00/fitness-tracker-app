@@ -32,6 +32,23 @@ pnpm typecheck
 pnpm build
 ```
 
+## WHOOP Setup
+
+Set these environment variables for the app:
+
+```bash
+APP_URL=https://app.iam360.ai
+WHOOP_CLIENT_ID=...
+WHOOP_CLIENT_SECRET=...
+WHOOP_SCOPES="offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement"
+```
+
+Configure the WHOOP developer dashboard with:
+
+- Redirect URL: `https://app.iam360.ai/api/integrations/whoop/callback`
+- Webhook URL: `https://app.iam360.ai/api/webhooks/whoop`
+- Webhook model version: `v2`
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
