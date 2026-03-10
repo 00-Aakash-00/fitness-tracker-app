@@ -39,42 +39,20 @@ export default async function DevicesPage({
 		redirect("/sign-in");
 	}
 
-	let supabaseUserId: string;
+	let supabaseUserId: string | null = null;
 	try {
 		supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 	} catch {
-		return (
-			<div className="space-y-6">
-				<div className="space-y-2">
-					<h1 className="font-primary text-2xl font-semibold text-primary-text">
-						Devices
-					</h1>
-					<p className="font-secondary text-sm text-secondary-text">
-						Your account is still being set up. Please refresh in a moment.
-					</p>
-				</div>
-				<Card>
-					<CardHeader>
-						<CardTitle>Account setup in progress</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<p className="text-sm text-secondary-text">
-							If this persists, ensure the Clerk → Supabase webhook is
-							configured and delivering events.
-						</p>
-					</CardContent>
-				</Card>
-			</div>
-		);
+		supabaseUserId = null;
 	}
 
 	const isWhoopAvailable = isWhoopConfigured();
 	const isOuraAvailable = isOuraConfigured();
 	const [whoopConnection, ouraConnection] = await Promise.all([
-		isWhoopAvailable
+		supabaseUserId && isWhoopAvailable
 			? getOAuthConnection({ userId: supabaseUserId, provider: "whoop" })
 			: Promise.resolve(null),
-		isOuraAvailable
+		supabaseUserId && isOuraAvailable
 			? getOAuthConnection({ userId: supabaseUserId, provider: "oura" })
 			: Promise.resolve(null),
 	]);

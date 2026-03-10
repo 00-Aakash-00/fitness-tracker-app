@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
 	getRequestOrigin,
+	getReturnToPath,
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
@@ -24,6 +25,7 @@ function isExpiringSoon(expiresAtIso: string | null, skewSeconds = 0) {
 
 export async function POST(request: NextRequest) {
 	const origin = getRequestOrigin(request);
+	const returnTo = getReturnToPath(request) ?? "/dashboard/devices";
 	const { userId } = await auth();
 	if (!userId) {
 		return new Response("Unauthorized", { status: 401 });
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
 		return new Response("Invalid origin", { status: 403 });
 	}
 
-	const redirectUrl = new URL("/dashboard/devices", origin);
+	const redirectUrl = new URL(returnTo, origin);
 	redirectUrl.searchParams.set("integration", "oura");
 
 	try {
