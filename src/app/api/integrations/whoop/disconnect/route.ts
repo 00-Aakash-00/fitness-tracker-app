@@ -4,13 +4,16 @@ import { NextResponse } from "next/server";
 import {
 	getCanonicalAppOrigin,
 	getReturnToPath,
-	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
 	deleteOAuthConnection,
 	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
 } from "@/lib/integrations/oauth-connections.server";
+import {
+	getWearableBrowserErrorMessage,
+	logWearableRouteError,
+} from "@/lib/integrations/wearable-route-errors.server";
 import { revokeWhoopAccess } from "@/lib/integrations/whoop.server";
 import { getValidWhoopAccessToken } from "@/lib/integrations/whoop-connection.server";
 import { purgeWhoopUserData } from "@/lib/integrations/whoop-storage.server";
@@ -47,8 +50,15 @@ export async function POST(request: NextRequest) {
 					supabaseUserId,
 				});
 				await revokeWhoopAccess(accessToken);
-			} catch {
+			} catch (error) {
 				// Best-effort revoke; still disconnect locally.
+				logWearableRouteError({
+					error,
+					phase: "revoke_remote_grant",
+					provider: "whoop",
+					route: "disconnect",
+					userId: supabaseUserId,
+				});
 			}
 
 			await purgeWhoopUserData({ userId: supabaseUserId });
@@ -61,9 +71,23 @@ export async function POST(request: NextRequest) {
 
 		redirectUrl.searchParams.set("status", "disconnected");
 		return NextResponse.redirect(redirectUrl, { status: 303 });
-	} catch (err) {
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "disconnect_local_state",
+			provider: "whoop",
+			route: "disconnect",
+			userId,
+		});
 		redirectUrl.searchParams.set("status", "error");
-		redirectUrl.searchParams.set("message", safeErrorMessage(err));
+		redirectUrl.searchParams.set(
+			"message",
+			getWearableBrowserErrorMessage({
+				error,
+				fallbackMessage: "Couldn't disconnect WHOOP. Please try again.",
+				provider: "whoop",
+			})
+		);
 		return NextResponse.redirect(redirectUrl, { status: 303 });
 	}
 }

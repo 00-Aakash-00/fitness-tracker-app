@@ -1,5 +1,11 @@
 import type { NextRequest } from "next/server";
+import { after } from "next/server";
 import { getOAuthConnectionByProviderUserId } from "@/lib/integrations/oauth-connections.server";
+import {
+	getWearableWebhookConfigMessage,
+	logWearableRouteError,
+	textNoStore,
+} from "@/lib/integrations/wearable-route-errors.server";
 import {
 	enqueueWhoopWebhookSync,
 	recordWhoopWebhookEvent,
@@ -14,80 +20,109 @@ import {
 
 export const runtime = "nodejs";
 
+function queueWhoopWebhookEvent(
+	params: Parameters<typeof recordWhoopWebhookEvent>[0]
+) {
+	after(() => {
+		recordWhoopWebhookEvent(params).catch((error) => {
+			logWearableRouteError({
+				error,
+				phase: "record_webhook_event",
+				provider: "whoop",
+				providerUserId: params.providerUserId,
+				route: "webhook",
+				userId: params.userId,
+			});
+		});
+	});
+}
+
 export async function POST(request: NextRequest) {
 	const signature = request.headers.get(WHOOP_WEBHOOK_SIGNATURE_HEADER);
 	const timestamp = request.headers.get(WHOOP_WEBHOOK_TIMESTAMP_HEADER);
 	const rawBody = await request.text();
 
 	if (!signature || !timestamp) {
-		await recordWhoopWebhookEvent({
+		queueWhoopWebhookEvent({
 			payload: { raw_body: rawBody },
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Missing WHOOP signature headers.",
 		});
-		return new Response("Missing WHOOP signature headers", { status: 400 });
+		return textNoStore("Missing WHOOP signature headers", { status: 400 });
 	}
 
 	if (!rawBody) {
-		await recordWhoopWebhookEvent({
+		queueWhoopWebhookEvent({
 			payload: { raw_body: rawBody },
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Missing WHOOP webhook body.",
 		});
-		return new Response("Missing WHOOP webhook body", { status: 400 });
+		return textNoStore("Missing WHOOP webhook body", { status: 400 });
 	}
 
-	if (
-		!verifyWhoopWebhookSignature({
+	let isValidSignature = false;
+	try {
+		isValidSignature = verifyWhoopWebhookSignature({
 			rawBody,
 			signature,
 			timestamp,
-		})
-	) {
-		await recordWhoopWebhookEvent({
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "verify_signature",
+			provider: "whoop",
+			route: "webhook",
+		});
+		return textNoStore(getWearableWebhookConfigMessage("whoop"), {
+			status: 503,
+		});
+	}
+
+	if (!isValidSignature) {
+		queueWhoopWebhookEvent({
 			payload: { raw_body: rawBody },
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Invalid WHOOP webhook signature.",
 		});
-		return new Response("Invalid WHOOP signature", { status: 401 });
+		return textNoStore("Invalid WHOOP signature", { status: 401 });
 	}
 
 	let payload: unknown;
-
 	try {
 		payload = JSON.parse(rawBody) as unknown;
 	} catch {
-		await recordWhoopWebhookEvent({
+		queueWhoopWebhookEvent({
 			payload: { raw_body: rawBody },
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Webhook body was not valid JSON.",
 		});
-		return new Response("Invalid WHOOP webhook payload", { status: 400 });
+		return textNoStore("Invalid WHOOP webhook payload", { status: 400 });
 	}
 
 	const envelope = parseWhoopWebhookEnvelope(payload);
 	if (!envelope) {
-		await recordWhoopWebhookEvent({
+		queueWhoopWebhookEvent({
 			payload,
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Webhook payload did not match the expected WHOOP schema.",
 		});
-		return new Response("Invalid WHOOP webhook payload", { status: 400 });
+		return textNoStore("Invalid WHOOP webhook payload", { status: 400 });
 	}
 
 	const event = parseWhoopWebhookEvent(payload);
 	if (!event) {
-		await recordWhoopWebhookEvent({
+		queueWhoopWebhookEvent({
 			providerUserId: String(envelope.user_id),
 			payload,
 			signature,
@@ -95,7 +130,7 @@ export async function POST(request: NextRequest) {
 			status: "ignored",
 			errorText: "Unsupported WHOOP webhook event type.",
 		});
-		return new Response("Ignored", { status: 202 });
+		return textNoStore("Ignored", { status: 202 });
 	}
 
 	try {
@@ -105,7 +140,7 @@ export async function POST(request: NextRequest) {
 		});
 
 		if (!connection?.user_id) {
-			await recordWhoopWebhookEvent({
+			queueWhoopWebhookEvent({
 				providerUserId: String(event.user_id),
 				payload: event,
 				signature,
@@ -113,7 +148,7 @@ export async function POST(request: NextRequest) {
 				status: "ignored",
 				errorText: "No local WHOOP connection matched this provider user.",
 			});
-			return new Response("Ignored", { status: 202 });
+			return textNoStore("Ignored", { status: 202 });
 		}
 
 		await enqueueWhoopWebhookSync({
@@ -121,7 +156,7 @@ export async function POST(request: NextRequest) {
 			payload: event,
 		});
 
-		await recordWhoopWebhookEvent({
+		queueWhoopWebhookEvent({
 			userId: connection.user_id,
 			providerUserId: String(event.user_id),
 			payload: event,
@@ -130,10 +165,16 @@ export async function POST(request: NextRequest) {
 			status: "queued",
 		});
 
-		return new Response("OK", { status: 200 });
+		return textNoStore("OK", { status: 200 });
 	} catch (error) {
-		console.error("Failed to process Whoop webhook", error);
-		await recordWhoopWebhookEvent({
+		logWearableRouteError({
+			error,
+			phase: "process_verified_event",
+			provider: "whoop",
+			providerUserId: String(event.user_id),
+			route: "webhook",
+		});
+		queueWhoopWebhookEvent({
 			providerUserId: String(envelope.user_id),
 			payload,
 			signature,
@@ -142,6 +183,6 @@ export async function POST(request: NextRequest) {
 			errorText:
 				error instanceof Error ? error.message : "Unexpected webhook failure",
 		});
-		return new Response("Webhook processing failed", { status: 500 });
+		return textNoStore("Webhook processing failed", { status: 500 });
 	}
 }

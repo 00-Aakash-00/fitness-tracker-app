@@ -5,14 +5,18 @@ import {
 	decodeCookiePayload,
 	getCanonicalAppOrigin,
 	OAUTH_STATE_COOKIE_NAME,
-	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
+	deleteOAuthConnection,
 	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
 	isOAuthConnectionProviderUserConflict,
 	upsertOAuthConnection,
 } from "@/lib/integrations/oauth-connections.server";
+import {
+	getWearableBrowserErrorMessage,
+	logWearableRouteError,
+} from "@/lib/integrations/wearable-route-errors.server";
 import {
 	buildWhoopCallbackUrl,
 	exchangeWhoopCodeForTokens,
@@ -22,14 +26,17 @@ import {
 	getWhoopAuthorizationErrorMessage,
 	isWhoopProviderError,
 	revokeWhoopAccess,
+	type WhoopTokenResponse,
 } from "@/lib/integrations/whoop.server";
 import {
 	deleteWhoopBodyMeasurement,
 	persistWhoopDocuments,
+	purgeWhoopUserData,
 } from "@/lib/integrations/whoop-storage.server";
 import {
 	enqueueInitialWhoopSyncJobs,
 	processPendingWhoopSyncJobs,
+	purgeWhoopSyncArtifacts,
 } from "@/lib/integrations/whoop-sync.server";
 
 export const runtime = "nodejs";
@@ -71,6 +78,72 @@ function redirectToDevicesWithStateReset(params: {
 	return response;
 }
 
+async function rollbackFailedWhoopConnection(params: {
+	supabaseUserId?: string | null;
+	token?: WhoopTokenResponse | null;
+}) {
+	if (params.token?.access_token) {
+		try {
+			await revokeWhoopAccess(params.token.access_token);
+		} catch (error) {
+			logWearableRouteError({
+				error,
+				phase: "rollback_revoke_token",
+				provider: "whoop",
+				route: "callback",
+				userId: params.supabaseUserId,
+			});
+		}
+	}
+
+	if (!params.supabaseUserId) {
+		return;
+	}
+
+	try {
+		await purgeWhoopUserData({
+			userId: params.supabaseUserId,
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "rollback_purge_user_data",
+			provider: "whoop",
+			route: "callback",
+			userId: params.supabaseUserId,
+		});
+	}
+
+	try {
+		await purgeWhoopSyncArtifacts({
+			userId: params.supabaseUserId,
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "rollback_purge_sync_artifacts",
+			provider: "whoop",
+			route: "callback",
+			userId: params.supabaseUserId,
+		});
+	}
+
+	try {
+		await deleteOAuthConnection({
+			userId: params.supabaseUserId,
+			provider: "whoop",
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "rollback_delete_connection",
+			provider: "whoop",
+			route: "callback",
+			userId: params.supabaseUserId,
+		});
+	}
+}
+
 export async function GET(request: NextRequest) {
 	const origin = getCanonicalAppOrigin(request);
 	const { userId } = await auth();
@@ -82,6 +155,10 @@ export async function GET(request: NextRequest) {
 	const rawCookie = request.cookies.get(cookieName)?.value;
 	const cookiePayload = rawCookie ? decodeCookiePayload(rawCookie) : null;
 	const returnTo = cookiePayload?.returnTo;
+
+	let token: WhoopTokenResponse | null = null;
+	let supabaseUserId: string | null = null;
+	let rollbackRequired = false;
 
 	try {
 		const error = request.nextUrl.searchParams.get("error");
@@ -149,24 +226,26 @@ export async function GET(request: NextRequest) {
 			});
 		}
 
-		const token = await exchangeWhoopCodeForTokens({
-			code,
-			redirectUri: cookiePayload.redirectUri,
-		});
+		supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 
-		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+		const whoopConnection = await getOAuthConnection({
+			userId: supabaseUserId,
+			provider: "whoop",
+		});
+		if (whoopConnection) {
+			return redirectToDevicesWithStateReset({
+				origin,
+				returnTo,
+				status: "error",
+				message: "WHOOP is already connected.",
+			});
+		}
+
 		const otherConnection = await getOAuthConnection({
 			userId: supabaseUserId,
 			provider: "oura",
 		});
-
 		if (otherConnection) {
-			try {
-				await revokeWhoopAccess(token.access_token);
-			} catch {
-				// Best-effort cleanup for a token we are intentionally rejecting.
-			}
-
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -174,6 +253,12 @@ export async function GET(request: NextRequest) {
 				message: "Disconnect Oura before connecting WHOOP.",
 			});
 		}
+
+		token = await exchangeWhoopCodeForTokens({
+			code,
+			redirectUri: cookiePayload.redirectUri,
+		});
+		rollbackRequired = true;
 
 		const profile = await fetchWhoopBasicProfile(token.access_token);
 		const bodyMeasurement = await fetchWhoopBodyMeasurement(
@@ -199,11 +284,10 @@ export async function GET(request: NextRequest) {
 			});
 		} catch (error) {
 			if (isOAuthConnectionProviderUserConflict(error)) {
-				try {
-					await revokeWhoopAccess(token.access_token);
-				} catch {
-					// Best-effort cleanup for a token we are intentionally rejecting.
-				}
+				await rollbackFailedWhoopConnection({
+					supabaseUserId,
+					token,
+				});
 
 				return redirectToDevicesWithStateReset({
 					origin,
@@ -235,6 +319,7 @@ export async function GET(request: NextRequest) {
 		await enqueueInitialWhoopSyncJobs({
 			userId: supabaseUserId,
 		});
+		rollbackRequired = false;
 
 		const response = redirectToDevices({
 			origin,
@@ -248,19 +333,42 @@ export async function GET(request: NextRequest) {
 				limit: 6,
 				workerId: `whoop-callback-${supabaseUserId}`,
 			}).catch((error) => {
-				console.error("Failed to process initial Whoop sync jobs", error);
+				logWearableRouteError({
+					error,
+					phase: "process_initial_sync",
+					provider: "whoop",
+					route: "callback",
+					userId: supabaseUserId,
+				});
 			});
 		});
 
 		return response;
-	} catch (err) {
-		const response = redirectToDevices({
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "handle_callback",
+			provider: "whoop",
+			route: "callback",
+			userId: supabaseUserId,
+		});
+
+		if (rollbackRequired) {
+			await rollbackFailedWhoopConnection({
+				supabaseUserId,
+				token,
+			});
+		}
+
+		return redirectToDevicesWithStateReset({
 			origin,
 			returnTo,
 			status: "error",
-			message: safeErrorMessage(err),
+			message: getWearableBrowserErrorMessage({
+				error,
+				fallbackMessage: "WHOOP connection failed. Please try again.",
+				provider: "whoop",
+			}),
 		});
-		clearWhoopStateCookie(response);
-		return response;
 	}
 }

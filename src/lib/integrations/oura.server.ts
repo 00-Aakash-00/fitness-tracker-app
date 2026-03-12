@@ -311,6 +311,14 @@ function getOuraUserMessage(params: {
 	const { context, status, code } = params;
 
 	if (context === "authorize") {
+		if (code === "invalid_client" || code === "invalid_redirect_uri") {
+			return "Oura integration is misconfigured. Contact support.";
+		}
+
+		if (code === "server_error" || code === "temporarily_unavailable") {
+			return "Oura is temporarily unavailable. Please try again.";
+		}
+
 		return "Oura access was not granted.";
 	}
 
@@ -617,6 +625,19 @@ export function buildOuraAuthorizeUrl(params: {
 	url.searchParams.set("scope", normalizeOuraScope(params.scope));
 	url.searchParams.set("state", params.state);
 	return url.toString();
+}
+
+export function getOuraAuthorizationErrorMessage(params: {
+	error: string;
+	errorDescription?: string | null;
+}) {
+	void params.errorDescription;
+
+	return getOuraUserMessage({
+		code: params.error.trim().toLowerCase(),
+		context: "authorize",
+		status: null,
+	});
 }
 
 export function getExpiresAtFromExpiresIn(expiresInSeconds: number): string {

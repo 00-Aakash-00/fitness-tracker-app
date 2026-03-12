@@ -8,18 +8,35 @@ import {
 	getReturnToPath,
 	OAUTH_STATE_COOKIE_NAME,
 	type OAuthStateCookiePayload,
-	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
 	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
 } from "@/lib/integrations/oauth-connections.server";
 import {
+	getWearableBrowserErrorMessage,
+	getWearableConfigMessage,
+	logWearableRouteError,
+} from "@/lib/integrations/wearable-route-errors.server";
+import {
 	buildWhoopAuthorizeUrl,
 	buildWhoopCallbackUrl,
 	getWhoopScopes,
 	isWhoopConfigured,
 } from "@/lib/integrations/whoop.server";
+
+function redirectToDevices(params: {
+	origin: string;
+	returnTo: string;
+	status: "error";
+	message: string;
+}) {
+	const url = new URL(params.returnTo, params.origin);
+	url.searchParams.set("integration", "whoop");
+	url.searchParams.set("status", params.status);
+	url.searchParams.set("message", params.message);
+	return NextResponse.redirect(url, { status: 303 });
+}
 
 export async function GET(request: NextRequest) {
 	const { userId } = await auth();
@@ -32,32 +49,41 @@ export async function GET(request: NextRequest) {
 	const redirectUri = buildWhoopCallbackUrl(origin);
 
 	if (!isWhoopConfigured()) {
-		const url = new URL(returnTo, origin);
-		url.searchParams.set("integration", "whoop");
-		url.searchParams.set("status", "error");
-		url.searchParams.set(
-			"message",
-			"Coming soon. WHOOP is not configured in this environment."
-		);
-		return NextResponse.redirect(url, { status: 303 });
+		return redirectToDevices({
+			origin,
+			returnTo,
+			status: "error",
+			message: getWearableConfigMessage("whoop"),
+		});
 	}
 
 	try {
 		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+		const whoopConnection = await getOAuthConnection({
+			userId: supabaseUserId,
+			provider: "whoop",
+		});
 		const ouraConnection = await getOAuthConnection({
 			userId: supabaseUserId,
 			provider: "oura",
 		});
 
+		if (whoopConnection) {
+			return redirectToDevices({
+				origin,
+				returnTo,
+				status: "error",
+				message: "WHOOP is already connected.",
+			});
+		}
+
 		if (ouraConnection) {
-			const url = new URL(returnTo, origin);
-			url.searchParams.set("integration", "whoop");
-			url.searchParams.set("status", "error");
-			url.searchParams.set(
-				"message",
-				"Disconnect Oura before connecting WHOOP."
-			);
-			return NextResponse.redirect(url, { status: 303 });
+			return redirectToDevices({
+				origin,
+				returnTo,
+				status: "error",
+				message: "Disconnect Oura before connecting WHOOP.",
+			});
 		}
 
 		const state = generateState(8);
@@ -86,11 +112,23 @@ export async function GET(request: NextRequest) {
 		);
 
 		return response;
-	} catch (err) {
-		const url = new URL(returnTo, origin);
-		url.searchParams.set("integration", "whoop");
-		url.searchParams.set("status", "error");
-		url.searchParams.set("message", safeErrorMessage(err));
-		return NextResponse.redirect(url, { status: 303 });
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "start_authorize",
+			provider: "whoop",
+			route: "authorize",
+			userId,
+		});
+		return redirectToDevices({
+			origin,
+			returnTo,
+			status: "error",
+			message: getWearableBrowserErrorMessage({
+				error,
+				fallbackMessage: "Couldn't start WHOOP connection. Please try again.",
+				provider: "whoop",
+			}),
+		});
 	}
 }

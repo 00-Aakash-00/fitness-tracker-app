@@ -17,16 +17,49 @@ export const OAUTH_STATE_COOKIE_NAME: Record<OAuthProvider, string> = {
 	oura: "__ft_oura_oauth_state",
 };
 
-export function getConfiguredAppOrigin(): string | null {
+function parseConfiguredAppOrigin(): {
+	error: Error | null;
+	origin: string | null;
+} {
 	const raw = process.env.APP_URL?.trim();
-	if (!raw) return null;
+	if (!raw) {
+		return {
+			error: null,
+			origin: null,
+		};
+	}
 
-	const url = new URL(raw);
-	return url.origin;
+	try {
+		return {
+			error: null,
+			origin: new URL(raw).origin,
+		};
+	} catch {
+		return {
+			error: new Error("Invalid APP_URL. Expected an absolute URL."),
+			origin: null,
+		};
+	}
+}
+
+export function getConfiguredAppOrigin(): string | null {
+	const { error, origin } = parseConfiguredAppOrigin();
+	if (error) {
+		throw error;
+	}
+
+	return origin;
 }
 
 export function getCanonicalAppOrigin(request: NextRequest): string {
-	return getConfiguredAppOrigin() ?? getRequestOrigin(request);
+	const { error, origin } = parseConfiguredAppOrigin();
+	if (error) {
+		console.error(
+			"Invalid APP_URL configured for wearable browser routes; falling back to request origin."
+		);
+	}
+
+	return origin ?? getRequestOrigin(request);
 }
 
 export function getRequestOrigin(request: NextRequest): string {

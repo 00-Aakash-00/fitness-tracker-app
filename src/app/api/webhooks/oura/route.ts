@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { getOAuthConnectionByProviderUserId } from "@/lib/integrations/oauth-connections.server";
 import { getOuraWebhookVerificationToken } from "@/lib/integrations/oura.server";
 import {
@@ -12,8 +12,31 @@ import {
 	parseOuraWebhookPayload,
 	verifyOuraWebhookSignature,
 } from "@/lib/integrations/oura-webhooks.server";
+import {
+	getWearableWebhookConfigMessage,
+	jsonNoStore,
+	logWearableRouteError,
+	textNoStore,
+} from "@/lib/integrations/wearable-route-errors.server";
 
 export const runtime = "nodejs";
+
+function queueOuraWebhookEvent(
+	params: Parameters<typeof recordOuraWebhookEvent>[0]
+) {
+	after(() => {
+		recordOuraWebhookEvent(params).catch((error) => {
+			logWearableRouteError({
+				error,
+				phase: "record_webhook_event",
+				provider: "oura",
+				providerUserId: params.providerUserId,
+				route: "webhook",
+				userId: params.userId,
+			});
+		});
+	});
+}
 
 export async function GET(request: NextRequest) {
 	const verificationToken =
@@ -21,14 +44,29 @@ export async function GET(request: NextRequest) {
 	const challenge = request.nextUrl.searchParams.get("challenge") ?? "";
 
 	if (!verificationToken || !challenge) {
-		return new Response("Missing verification parameters", { status: 400 });
+		return textNoStore("Missing verification parameters", { status: 400 });
 	}
 
-	if (verificationToken !== getOuraWebhookVerificationToken()) {
-		return new Response("Invalid verification token", { status: 401 });
+	let expectedVerificationToken: string;
+	try {
+		expectedVerificationToken = getOuraWebhookVerificationToken();
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "load_verification_token",
+			provider: "oura",
+			route: "webhook",
+		});
+		return textNoStore(getWearableWebhookConfigMessage("oura"), {
+			status: 503,
+		});
 	}
 
-	return NextResponse.json({ challenge });
+	if (verificationToken !== expectedVerificationToken) {
+		return textNoStore("Invalid verification token", { status: 401 });
+	}
+
+	return jsonNoStore({ challenge });
 }
 
 export async function POST(request: NextRequest) {
@@ -40,54 +78,67 @@ export async function POST(request: NextRequest) {
 	try {
 		parsedBody = rawBody ? (JSON.parse(rawBody) as unknown) : {};
 	} catch {
-		await recordOuraWebhookEvent({
+		queueOuraWebhookEvent({
 			payload: { raw_body: rawBody },
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Webhook body was not valid JSON.",
 		});
-		return new Response("Invalid JSON body", { status: 400 });
+		return textNoStore("Invalid JSON body", { status: 400 });
 	}
 
 	if (!signature || !timestamp) {
-		await recordOuraWebhookEvent({
+		queueOuraWebhookEvent({
 			payload: parsedBody,
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Missing Oura webhook signature headers.",
 		});
-		return new Response("Missing signature headers", { status: 401 });
+		return textNoStore("Missing signature headers", { status: 401 });
 	}
 
-	if (
-		!verifyOuraWebhookSignature({
+	let isValidSignature = false;
+	try {
+		isValidSignature = verifyOuraWebhookSignature({
 			rawBody,
 			signature,
 			timestamp,
-		})
-	) {
-		await recordOuraWebhookEvent({
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "verify_signature",
+			provider: "oura",
+			route: "webhook",
+		});
+		return textNoStore(getWearableWebhookConfigMessage("oura"), {
+			status: 503,
+		});
+	}
+
+	if (!isValidSignature) {
+		queueOuraWebhookEvent({
 			payload: parsedBody,
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Invalid Oura webhook signature.",
 		});
-		return new Response("Invalid signature", { status: 401 });
+		return textNoStore("Invalid signature", { status: 401 });
 	}
 
 	const payload = parseOuraWebhookPayload(parsedBody);
 	if (!payload) {
-		await recordOuraWebhookEvent({
+		queueOuraWebhookEvent({
 			payload: parsedBody,
 			signature,
 			timestampHeader: timestamp,
 			status: "rejected",
 			errorText: "Webhook payload did not match the expected Oura schema.",
 		});
-		return new Response("Invalid payload", { status: 400 });
+		return textNoStore("Invalid payload", { status: 400 });
 	}
 
 	try {
@@ -97,7 +148,7 @@ export async function POST(request: NextRequest) {
 		});
 
 		if (!connection?.user_id) {
-			await recordOuraWebhookEvent({
+			queueOuraWebhookEvent({
 				providerUserId: payload.user_id,
 				payload,
 				signature,
@@ -105,7 +156,7 @@ export async function POST(request: NextRequest) {
 				status: "ignored",
 				errorText: "No local Oura connection matched this provider user.",
 			});
-			return new Response("Ignored", { status: 202 });
+			return textNoStore("Ignored", { status: 202 });
 		}
 
 		await enqueueOuraWebhookSync({
@@ -113,7 +164,7 @@ export async function POST(request: NextRequest) {
 			payload,
 		});
 
-		await recordOuraWebhookEvent({
+		queueOuraWebhookEvent({
 			userId: connection.user_id,
 			providerUserId: payload.user_id,
 			payload,
@@ -122,10 +173,16 @@ export async function POST(request: NextRequest) {
 			status: "queued",
 		});
 
-		return new Response("OK", { status: 200 });
+		return textNoStore("OK", { status: 200 });
 	} catch (error) {
-		console.error("Failed to process Oura webhook", error);
-		await recordOuraWebhookEvent({
+		logWearableRouteError({
+			error,
+			phase: "process_verified_event",
+			provider: "oura",
+			providerUserId: payload.user_id,
+			route: "webhook",
+		});
+		queueOuraWebhookEvent({
 			providerUserId: payload.user_id,
 			payload,
 			signature,
@@ -134,6 +191,6 @@ export async function POST(request: NextRequest) {
 			errorText:
 				error instanceof Error ? error.message : "Unexpected webhook failure",
 		});
-		return new Response("Webhook processing failed", { status: 500 });
+		return textNoStore("Webhook processing failed", { status: 500 });
 	}
 }

@@ -5,9 +5,9 @@ import {
 	decodeCookiePayload,
 	getCanonicalAppOrigin,
 	OAUTH_STATE_COOKIE_NAME,
-	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
+	deleteOAuthConnection,
 	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
 	isOAuthConnectionProviderUserConflict,
@@ -18,13 +18,23 @@ import {
 	exchangeOuraCodeForTokens,
 	fetchOuraPersonalInfo,
 	getExpiresAtFromExpiresIn,
+	getOuraAuthorizationErrorMessage,
+	type OuraTokenResponse,
 	revokeOuraAccess,
 } from "@/lib/integrations/oura.server";
-import { persistOuraPersonalInfo } from "@/lib/integrations/oura-storage.server";
+import {
+	persistOuraPersonalInfo,
+	purgeOuraUserData,
+} from "@/lib/integrations/oura-storage.server";
 import {
 	enqueueInitialOuraSyncJobs,
 	processPendingOuraSyncJobs,
+	purgeOuraSyncArtifacts,
 } from "@/lib/integrations/oura-sync.server";
+import {
+	getWearableBrowserErrorMessage,
+	logWearableRouteError,
+} from "@/lib/integrations/wearable-route-errors.server";
 
 export const runtime = "nodejs";
 
@@ -65,6 +75,72 @@ function redirectToDevicesWithStateReset(params: {
 	return response;
 }
 
+async function rollbackFailedOuraConnection(params: {
+	supabaseUserId?: string | null;
+	token?: OuraTokenResponse | null;
+}) {
+	if (params.token?.access_token) {
+		try {
+			await revokeOuraAccess(params.token.access_token);
+		} catch (error) {
+			logWearableRouteError({
+				error,
+				phase: "rollback_revoke_token",
+				provider: "oura",
+				route: "callback",
+				userId: params.supabaseUserId,
+			});
+		}
+	}
+
+	if (!params.supabaseUserId) {
+		return;
+	}
+
+	try {
+		await purgeOuraUserData({
+			userId: params.supabaseUserId,
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "rollback_purge_user_data",
+			provider: "oura",
+			route: "callback",
+			userId: params.supabaseUserId,
+		});
+	}
+
+	try {
+		await purgeOuraSyncArtifacts({
+			userId: params.supabaseUserId,
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "rollback_purge_sync_artifacts",
+			provider: "oura",
+			route: "callback",
+			userId: params.supabaseUserId,
+		});
+	}
+
+	try {
+		await deleteOAuthConnection({
+			userId: params.supabaseUserId,
+			provider: "oura",
+		});
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "rollback_delete_connection",
+			provider: "oura",
+			route: "callback",
+			userId: params.supabaseUserId,
+		});
+	}
+}
+
 export async function GET(request: NextRequest) {
 	const origin = getCanonicalAppOrigin(request);
 	const { userId } = await auth();
@@ -77,6 +153,10 @@ export async function GET(request: NextRequest) {
 	const cookiePayload = rawCookie ? decodeCookiePayload(rawCookie) : null;
 	const returnTo = cookiePayload?.returnTo;
 
+	let token: OuraTokenResponse | null = null;
+	let supabaseUserId: string | null = null;
+	let rollbackRequired = false;
+
 	try {
 		const error = request.nextUrl.searchParams.get("error");
 		const errorDescription =
@@ -87,7 +167,10 @@ export async function GET(request: NextRequest) {
 				origin,
 				returnTo,
 				status: "error",
-				message: errorDescription ? `${error}: ${errorDescription}` : error,
+				message: getOuraAuthorizationErrorMessage({
+					error,
+					errorDescription,
+				}),
 			});
 		}
 
@@ -140,24 +223,26 @@ export async function GET(request: NextRequest) {
 			});
 		}
 
-		const token = await exchangeOuraCodeForTokens({
-			code,
-			redirectUri: cookiePayload.redirectUri,
-		});
+		supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 
-		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+		const ouraConnection = await getOAuthConnection({
+			userId: supabaseUserId,
+			provider: "oura",
+		});
+		if (ouraConnection) {
+			return redirectToDevicesWithStateReset({
+				origin,
+				returnTo,
+				status: "error",
+				message: "Oura is already connected.",
+			});
+		}
+
 		const otherConnection = await getOAuthConnection({
 			userId: supabaseUserId,
 			provider: "whoop",
 		});
-
 		if (otherConnection) {
-			try {
-				await revokeOuraAccess(token.access_token);
-			} catch {
-				// Best-effort cleanup for a token we are intentionally rejecting.
-			}
-
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -165,6 +250,12 @@ export async function GET(request: NextRequest) {
 				message: "Disconnect WHOOP before connecting Oura.",
 			});
 		}
+
+		token = await exchangeOuraCodeForTokens({
+			code,
+			redirectUri: cookiePayload.redirectUri,
+		});
+		rollbackRequired = true;
 
 		const personalInfo = await fetchOuraPersonalInfo(token.access_token);
 
@@ -181,11 +272,10 @@ export async function GET(request: NextRequest) {
 			});
 		} catch (error) {
 			if (isOAuthConnectionProviderUserConflict(error)) {
-				try {
-					await revokeOuraAccess(token.access_token);
-				} catch {
-					// Best-effort cleanup for a token we are intentionally rejecting.
-				}
+				await rollbackFailedOuraConnection({
+					supabaseUserId,
+					token,
+				});
 
 				return redirectToDevicesWithStateReset({
 					origin,
@@ -205,6 +295,7 @@ export async function GET(request: NextRequest) {
 		await enqueueInitialOuraSyncJobs({
 			userId: supabaseUserId,
 		});
+		rollbackRequired = false;
 
 		const response = redirectToDevices({
 			origin,
@@ -218,19 +309,42 @@ export async function GET(request: NextRequest) {
 				limit: 6,
 				workerId: `oura-callback-${supabaseUserId}`,
 			}).catch((error) => {
-				console.error("Failed to process initial Oura sync jobs", error);
+				logWearableRouteError({
+					error,
+					phase: "process_initial_sync",
+					provider: "oura",
+					route: "callback",
+					userId: supabaseUserId,
+				});
 			});
 		});
 
 		return response;
-	} catch (err) {
-		const response = redirectToDevices({
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "handle_callback",
+			provider: "oura",
+			route: "callback",
+			userId: supabaseUserId,
+		});
+
+		if (rollbackRequired) {
+			await rollbackFailedOuraConnection({
+				supabaseUserId,
+				token,
+			});
+		}
+
+		return redirectToDevicesWithStateReset({
 			origin,
 			returnTo,
 			status: "error",
-			message: safeErrorMessage(err),
+			message: getWearableBrowserErrorMessage({
+				error,
+				fallbackMessage: "Oura connection failed. Please try again.",
+				provider: "oura",
+			}),
 		});
-		clearOuraStateCookie(response);
-		return response;
 	}
 }

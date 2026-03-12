@@ -8,7 +8,6 @@ import {
 	getReturnToPath,
 	OAUTH_STATE_COOKIE_NAME,
 	type OAuthStateCookiePayload,
-	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
 	getOAuthConnection,
@@ -20,6 +19,24 @@ import {
 	getOuraScopes,
 	isOuraConfigured,
 } from "@/lib/integrations/oura.server";
+import {
+	getWearableBrowserErrorMessage,
+	getWearableConfigMessage,
+	logWearableRouteError,
+} from "@/lib/integrations/wearable-route-errors.server";
+
+function redirectToDevices(params: {
+	origin: string;
+	returnTo: string;
+	status: "error";
+	message: string;
+}) {
+	const url = new URL(params.returnTo, params.origin);
+	url.searchParams.set("integration", "oura");
+	url.searchParams.set("status", params.status);
+	url.searchParams.set("message", params.message);
+	return NextResponse.redirect(url, { status: 303 });
+}
 
 export async function GET(request: NextRequest) {
 	const { userId } = await auth();
@@ -32,32 +49,41 @@ export async function GET(request: NextRequest) {
 	const redirectUri = buildOuraCallbackUrl(origin);
 
 	if (!isOuraConfigured()) {
-		const url = new URL(returnTo, origin);
-		url.searchParams.set("integration", "oura");
-		url.searchParams.set("status", "error");
-		url.searchParams.set(
-			"message",
-			"Coming soon. Oura is not configured in this environment."
-		);
-		return NextResponse.redirect(url, { status: 303 });
+		return redirectToDevices({
+			origin,
+			returnTo,
+			status: "error",
+			message: getWearableConfigMessage("oura"),
+		});
 	}
 
 	try {
 		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+		const ouraConnection = await getOAuthConnection({
+			userId: supabaseUserId,
+			provider: "oura",
+		});
 		const whoopConnection = await getOAuthConnection({
 			userId: supabaseUserId,
 			provider: "whoop",
 		});
 
+		if (ouraConnection) {
+			return redirectToDevices({
+				origin,
+				returnTo,
+				status: "error",
+				message: "Oura is already connected.",
+			});
+		}
+
 		if (whoopConnection) {
-			const url = new URL(returnTo, origin);
-			url.searchParams.set("integration", "oura");
-			url.searchParams.set("status", "error");
-			url.searchParams.set(
-				"message",
-				"Disconnect WHOOP before connecting Oura."
-			);
-			return NextResponse.redirect(url, { status: 303 });
+			return redirectToDevices({
+				origin,
+				returnTo,
+				status: "error",
+				message: "Disconnect WHOOP before connecting Oura.",
+			});
 		}
 
 		const state = generateState(32);
@@ -86,11 +112,23 @@ export async function GET(request: NextRequest) {
 		);
 
 		return response;
-	} catch (err) {
-		const url = new URL(returnTo, origin);
-		url.searchParams.set("integration", "oura");
-		url.searchParams.set("status", "error");
-		url.searchParams.set("message", safeErrorMessage(err));
-		return NextResponse.redirect(url, { status: 303 });
+	} catch (error) {
+		logWearableRouteError({
+			error,
+			phase: "start_authorize",
+			provider: "oura",
+			route: "authorize",
+			userId,
+		});
+		return redirectToDevices({
+			origin,
+			returnTo,
+			status: "error",
+			message: getWearableBrowserErrorMessage({
+				error,
+				fallbackMessage: "Couldn't start Oura connection. Please try again.",
+				provider: "oura",
+			}),
+		});
 	}
 }
