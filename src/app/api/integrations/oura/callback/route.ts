@@ -1,21 +1,32 @@
 import { auth } from "@clerk/nextjs/server";
 import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import {
 	decodeCookiePayload,
-	getRequestOrigin,
+	getCanonicalAppOrigin,
 	OAUTH_STATE_COOKIE_NAME,
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
+	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
+	isOAuthConnectionProviderUserConflict,
 	upsertOAuthConnection,
 } from "@/lib/integrations/oauth-connections.server";
 import {
+	buildOuraCallbackUrl,
 	exchangeOuraCodeForTokens,
 	fetchOuraPersonalInfo,
 	getExpiresAtFromExpiresIn,
+	revokeOuraAccess,
 } from "@/lib/integrations/oura.server";
+import { persistOuraPersonalInfo } from "@/lib/integrations/oura-storage.server";
+import {
+	enqueueInitialOuraSyncJobs,
+	processPendingOuraSyncJobs,
+} from "@/lib/integrations/oura-sync.server";
+
+export const runtime = "nodejs";
 
 const OURA_STATE_COOKIE_PATH = "/api/integrations/oura/callback";
 const OURA_STATE_TTL_MS = 10 * 60 * 1000;
@@ -55,10 +66,10 @@ function redirectToDevicesWithStateReset(params: {
 }
 
 export async function GET(request: NextRequest) {
-	const origin = getRequestOrigin(request);
+	const origin = getCanonicalAppOrigin(request);
 	const { userId } = await auth();
 	if (!userId) {
-		return NextResponse.redirect(new URL("/sign-in", request.url));
+		return NextResponse.redirect(new URL("/sign-in", origin));
 	}
 
 	const cookieName = OAUTH_STATE_COOKIE_NAME.oura;
@@ -92,7 +103,7 @@ export async function GET(request: NextRequest) {
 			});
 		}
 
-		const expectedRedirectUri = `${origin}${OURA_STATE_COOKIE_PATH}`;
+		const expectedRedirectUri = buildOuraCallbackUrl(origin);
 		if (cookiePayload.redirectUri !== expectedRedirectUri) {
 			return redirectToDevicesWithStateReset({
 				origin,
@@ -134,18 +145,65 @@ export async function GET(request: NextRequest) {
 			redirectUri: cookiePayload.redirectUri,
 		});
 
-		const personalInfo = await fetchOuraPersonalInfo(token.access_token);
 		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-
-		await upsertOAuthConnection({
+		const otherConnection = await getOAuthConnection({
 			userId: supabaseUserId,
-			provider: "oura",
-			providerUserId: personalInfo.id,
-			accessToken: token.access_token,
-			refreshToken: token.refresh_token ?? null,
-			tokenType: token.token_type ?? null,
-			scope: token.scope ?? null,
-			accessTokenExpiresAt: getExpiresAtFromExpiresIn(token.expires_in),
+			provider: "whoop",
+		});
+
+		if (otherConnection) {
+			try {
+				await revokeOuraAccess(token.access_token);
+			} catch {
+				// Best-effort cleanup for a token we are intentionally rejecting.
+			}
+
+			return redirectToDevicesWithStateReset({
+				origin,
+				returnTo,
+				status: "error",
+				message: "Disconnect WHOOP before connecting Oura.",
+			});
+		}
+
+		const personalInfo = await fetchOuraPersonalInfo(token.access_token);
+
+		try {
+			await upsertOAuthConnection({
+				userId: supabaseUserId,
+				provider: "oura",
+				providerUserId: personalInfo.id,
+				accessToken: token.access_token,
+				refreshToken: token.refresh_token ?? null,
+				tokenType: token.token_type ?? null,
+				scope: token.scope ?? null,
+				accessTokenExpiresAt: getExpiresAtFromExpiresIn(token.expires_in),
+			});
+		} catch (error) {
+			if (isOAuthConnectionProviderUserConflict(error)) {
+				try {
+					await revokeOuraAccess(token.access_token);
+				} catch {
+					// Best-effort cleanup for a token we are intentionally rejecting.
+				}
+
+				return redirectToDevicesWithStateReset({
+					origin,
+					returnTo,
+					status: "error",
+					message: "This Oura account is already connected to another user.",
+				});
+			}
+
+			throw error;
+		}
+
+		await persistOuraPersonalInfo({
+			userId: supabaseUserId,
+			personalInfo,
+		});
+		await enqueueInitialOuraSyncJobs({
+			userId: supabaseUserId,
 		});
 
 		const response = redirectToDevices({
@@ -154,6 +212,16 @@ export async function GET(request: NextRequest) {
 			status: "connected",
 		});
 		clearOuraStateCookie(response);
+
+		after(() => {
+			processPendingOuraSyncJobs({
+				limit: 6,
+				workerId: `oura-callback-${supabaseUserId}`,
+			}).catch((error) => {
+				console.error("Failed to process initial Oura sync jobs", error);
+			});
+		});
+
 		return response;
 	} catch (err) {
 		const response = redirectToDevices({

@@ -11,6 +11,7 @@ export function Footer() {
 					<div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-xs text-secondary-text md:justify-start">
 						<Link
 							href="/blog"
+							prefetch={false}
 							className="hover:text-primary-text transition-colors"
 						>
 							Blog

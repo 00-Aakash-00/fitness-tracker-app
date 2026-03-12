@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
-	getRequestOrigin,
+	getCanonicalAppOrigin,
 	getReturnToPath,
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
@@ -13,9 +13,13 @@ import {
 } from "@/lib/integrations/oauth-connections.server";
 import { revokeWhoopAccess } from "@/lib/integrations/whoop.server";
 import { getValidWhoopAccessToken } from "@/lib/integrations/whoop-connection.server";
+import { purgeWhoopUserData } from "@/lib/integrations/whoop-storage.server";
+import { purgeWhoopSyncArtifacts } from "@/lib/integrations/whoop-sync.server";
+
+export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-	const origin = getRequestOrigin(request);
+	const origin = getCanonicalAppOrigin(request);
 	const returnTo = getReturnToPath(request) ?? "/dashboard/devices";
 	const { userId } = await auth();
 	if (!userId) {
@@ -47,6 +51,8 @@ export async function POST(request: NextRequest) {
 				// Best-effort revoke; still disconnect locally.
 			}
 
+			await purgeWhoopUserData({ userId: supabaseUserId });
+			await purgeWhoopSyncArtifacts({ userId: supabaseUserId });
 			await deleteOAuthConnection({
 				userId: supabaseUserId,
 				provider: "whoop",

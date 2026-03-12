@@ -11,6 +11,10 @@ import {
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
+	getOAuthConnection,
+	getSupabaseUserIdByClerkId,
+} from "@/lib/integrations/oauth-connections.server";
+import {
 	buildWhoopAuthorizeUrl,
 	buildWhoopCallbackUrl,
 	getWhoopScopes,
@@ -39,6 +43,23 @@ export async function GET(request: NextRequest) {
 	}
 
 	try {
+		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+		const ouraConnection = await getOAuthConnection({
+			userId: supabaseUserId,
+			provider: "oura",
+		});
+
+		if (ouraConnection) {
+			const url = new URL(returnTo, origin);
+			url.searchParams.set("integration", "whoop");
+			url.searchParams.set("status", "error");
+			url.searchParams.set(
+				"message",
+				"Disconnect Oura before connecting WHOOP."
+			);
+			return NextResponse.redirect(url, { status: 303 });
+		}
+
 		const state = generateState(8);
 		const scope = getWhoopScopes();
 		const authorizeUrl = buildWhoopAuthorizeUrl({ redirectUri, state, scope });

@@ -1,8 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-	/* config options here */
 	reactCompiler: true,
+	async redirects() {
+		return [
+			{
+				source: "/blog",
+				destination: "https://www.iam360.ai/blog",
+				permanent: true,
+			},
+		];
+	},
 };
 
 export default nextConfig;

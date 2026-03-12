@@ -67,6 +67,8 @@ export default async function DevicesPage({
 		typeof searchParams?.message === "string"
 			? searchParams.message
 			: undefined;
+	const isWhoopBlocked = Boolean(ouraConnection) && !whoopConnection;
+	const isOuraBlocked = Boolean(whoopConnection) && !ouraConnection;
 
 	return (
 		<div className="space-y-6">
@@ -75,7 +77,10 @@ export default async function DevicesPage({
 					Devices
 				</h1>
 				<p className="font-secondary text-sm text-secondary-text">
-					Connect WHOOP and Oura to sync your fitness data.
+					Connect one wearable provider at a time to sync your fitness data.
+				</p>
+				<p className="font-secondary text-sm text-secondary-text">
+					Disconnect your current provider before switching to the other one.
 				</p>
 			</div>
 
@@ -139,7 +144,9 @@ export default async function DevicesPage({
 									? "Coming soon"
 									: whoopConnection
 										? "Connected"
-										: "Not connected"}
+										: isWhoopBlocked
+											? "Unavailable"
+											: "Not connected"}
 							</span>
 						</div>
 					</CardHeader>
@@ -164,6 +171,10 @@ export default async function DevicesPage({
 									{whoopConnection.scope ?? "—"}
 								</p>
 							</div>
+						) : isWhoopBlocked ? (
+							<p className="text-sm text-secondary-text">
+								Disconnect Oura before connecting WHOOP.
+							</p>
 						) : (
 							<p className="text-sm text-secondary-text">
 								Connect your WHOOP account to start syncing data.
@@ -181,6 +192,10 @@ export default async function DevicesPage({
 										Disconnect
 									</Button>
 								</form>
+							) : isWhoopBlocked ? (
+								<Button variant="outline" type="button" disabled>
+									Disconnect Oura First
+								</Button>
 							) : (
 								<Button asChild>
 									<Link href="/api/integrations/whoop/authorize?returnTo=/dashboard/devices">
@@ -223,7 +238,9 @@ export default async function DevicesPage({
 									? "Coming soon"
 									: ouraConnection
 										? "Connected"
-										: "Not connected"}
+										: isOuraBlocked
+											? "Unavailable"
+											: "Not connected"}
 							</span>
 						</div>
 					</CardHeader>
@@ -248,6 +265,10 @@ export default async function DevicesPage({
 									{ouraConnection.scope ?? "—"}
 								</p>
 							</div>
+						) : isOuraBlocked ? (
+							<p className="text-sm text-secondary-text">
+								Disconnect WHOOP before connecting Oura.
+							</p>
 						) : (
 							<p className="text-sm text-secondary-text">
 								Connect your Oura account to start syncing data.
@@ -265,6 +286,10 @@ export default async function DevicesPage({
 										Disconnect
 									</Button>
 								</form>
+							) : isOuraBlocked ? (
+								<Button variant="outline" type="button" disabled>
+									Disconnect WHOOP First
+								</Button>
 							) : (
 								<Button asChild>
 									<Link href="/api/integrations/oura/authorize?returnTo=/dashboard/devices">

@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import {
 	decodeCookiePayload,
 	getCanonicalAppOrigin,
@@ -8,6 +8,7 @@ import {
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
+	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
 	isOAuthConnectionProviderUserConflict,
 	upsertOAuthConnection,
@@ -16,9 +17,22 @@ import {
 	buildWhoopCallbackUrl,
 	exchangeWhoopCodeForTokens,
 	fetchWhoopBasicProfile,
+	fetchWhoopBodyMeasurement,
 	getExpiresAtFromExpiresIn,
 	getWhoopAuthorizationErrorMessage,
+	isWhoopProviderError,
+	revokeWhoopAccess,
 } from "@/lib/integrations/whoop.server";
+import {
+	deleteWhoopBodyMeasurement,
+	persistWhoopDocuments,
+} from "@/lib/integrations/whoop-storage.server";
+import {
+	enqueueInitialWhoopSyncJobs,
+	processPendingWhoopSyncJobs,
+} from "@/lib/integrations/whoop-sync.server";
+
+export const runtime = "nodejs";
 
 const WHOOP_STATE_COOKIE_PATH = "/api/integrations/whoop/callback";
 const WHOOP_STATE_TTL_MS = 10 * 60 * 1000;
@@ -140,14 +154,43 @@ export async function GET(request: NextRequest) {
 			redirectUri: cookiePayload.redirectUri,
 		});
 
-		const profile = await fetchWhoopBasicProfile(token.access_token);
 		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+		const otherConnection = await getOAuthConnection({
+			userId: supabaseUserId,
+			provider: "oura",
+		});
+
+		if (otherConnection) {
+			try {
+				await revokeWhoopAccess(token.access_token);
+			} catch {
+				// Best-effort cleanup for a token we are intentionally rejecting.
+			}
+
+			return redirectToDevicesWithStateReset({
+				origin,
+				returnTo,
+				status: "error",
+				message: "Disconnect Oura before connecting WHOOP.",
+			});
+		}
+
+		const profile = await fetchWhoopBasicProfile(token.access_token);
+		const bodyMeasurement = await fetchWhoopBodyMeasurement(
+			token.access_token
+		).catch((error) => {
+			if (isWhoopProviderError(error) && error.status === 404) {
+				return null;
+			}
+
+			throw error;
+		});
 
 		try {
 			await upsertOAuthConnection({
 				userId: supabaseUserId,
 				provider: "whoop",
-				providerUserId: String(profile.user_id),
+				providerUserId: profile.user_id,
 				accessToken: token.access_token,
 				refreshToken: token.refresh_token ?? null,
 				tokenType: token.token_type ?? null,
@@ -156,17 +199,42 @@ export async function GET(request: NextRequest) {
 			});
 		} catch (error) {
 			if (isOAuthConnectionProviderUserConflict(error)) {
+				try {
+					await revokeWhoopAccess(token.access_token);
+				} catch {
+					// Best-effort cleanup for a token we are intentionally rejecting.
+				}
+
 				return redirectToDevicesWithStateReset({
 					origin,
 					returnTo,
 					status: "error",
-					message:
-						"This WHOOP account is already connected to another IAM360 account.",
+					message: "This WHOOP account is already connected to another user.",
 				});
 			}
 
 			throw error;
 		}
+
+		await persistWhoopDocuments({
+			userId: supabaseUserId,
+			dataType: "profile",
+			documents: [profile],
+		});
+		if (bodyMeasurement) {
+			await persistWhoopDocuments({
+				userId: supabaseUserId,
+				dataType: "body_measurement",
+				documents: [bodyMeasurement],
+			});
+		} else {
+			await deleteWhoopBodyMeasurement({
+				userId: supabaseUserId,
+			});
+		}
+		await enqueueInitialWhoopSyncJobs({
+			userId: supabaseUserId,
+		});
 
 		const response = redirectToDevices({
 			origin,
@@ -174,6 +242,16 @@ export async function GET(request: NextRequest) {
 			status: "connected",
 		});
 		clearWhoopStateCookie(response);
+
+		after(() => {
+			processPendingWhoopSyncJobs({
+				limit: 6,
+				workerId: `whoop-callback-${supabaseUserId}`,
+			}).catch((error) => {
+				console.error("Failed to process initial Whoop sync jobs", error);
+			});
+		});
+
 		return response;
 	} catch (err) {
 		const response = redirectToDevices({

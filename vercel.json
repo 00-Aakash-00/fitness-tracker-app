@@ -1,0 +1,12 @@
+{
+	"crons": [
+		{
+			"path": "/api/internal/oura/sync",
+			"schedule": "*/5 * * * *"
+		},
+		{
+			"path": "/api/internal/whoop/sync",
+			"schedule": "*/5 * * * *"
+		}
+	]
+}

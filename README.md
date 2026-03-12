@@ -32,15 +32,24 @@ pnpm typecheck
 pnpm build
 ```
 
-## WHOOP Setup
+## Integration Setup
 
 Set these environment variables for the app:
 
 ```bash
 APP_URL=https://app.iam360.ai
+CRON_SECRET=...
+
 WHOOP_CLIENT_ID=...
 WHOOP_CLIENT_SECRET=...
 WHOOP_SCOPES="offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement"
+WHOOP_SYNC_SECRET=...
+
+OURA_CLIENT_ID=...
+OURA_CLIENT_SECRET=...
+OURA_SCOPES="email personal daily heartrate workout session tag spo2"
+OURA_WEBHOOK_VERIFICATION_TOKEN=...
+OURA_SYNC_SECRET=...
 ```
 
 Configure the WHOOP developer dashboard with:
@@ -48,6 +57,23 @@ Configure the WHOOP developer dashboard with:
 - Redirect URL: `https://app.iam360.ai/api/integrations/whoop/callback`
 - Webhook URL: `https://app.iam360.ai/api/webhooks/whoop`
 - Webhook model version: `v2`
+
+Configure the Oura developer application with:
+
+- Redirect URL: `https://app.iam360.ai/api/integrations/oura/callback`
+
+Oura webhook subscriptions are created and renewed automatically against:
+
+- Callback URL: `https://app.iam360.ai/api/webhooks/oura`
+
+Internal sync routes are protected with bearer auth:
+
+- Vercel cron uses `CRON_SECRET`
+- Manual/internal calls can use `WHOOP_SYNC_SECRET` or `OURA_SYNC_SECRET`
+
+The backend enforces a single active wearable provider per user. A user must
+disconnect Oura before connecting WHOOP, and disconnect WHOOP before connecting
+Oura.
 
 ## Learn More
 

@@ -1,0 +1,1 @@
+-- Seed data is intentionally empty. Local resets still reference this file.

@@ -4,14 +4,19 @@ import { NextResponse } from "next/server";
 import {
 	encodeCookiePayload,
 	generateState,
-	getRequestOrigin,
+	getCanonicalAppOrigin,
 	getReturnToPath,
 	OAUTH_STATE_COOKIE_NAME,
 	type OAuthStateCookiePayload,
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
 import {
+	getOAuthConnection,
+	getSupabaseUserIdByClerkId,
+} from "@/lib/integrations/oauth-connections.server";
+import {
 	buildOuraAuthorizeUrl,
+	buildOuraCallbackUrl,
 	getOuraScopes,
 	isOuraConfigured,
 } from "@/lib/integrations/oura.server";
@@ -22,9 +27,9 @@ export async function GET(request: NextRequest) {
 		return NextResponse.redirect(new URL("/sign-in", request.url));
 	}
 
-	const origin = getRequestOrigin(request);
+	const origin = getCanonicalAppOrigin(request);
 	const returnTo = getReturnToPath(request) ?? "/dashboard/devices";
-	const redirectUri = `${origin}/api/integrations/oura/callback`;
+	const redirectUri = buildOuraCallbackUrl(origin);
 
 	if (!isOuraConfigured()) {
 		const url = new URL(returnTo, origin);
@@ -38,6 +43,23 @@ export async function GET(request: NextRequest) {
 	}
 
 	try {
+		const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+		const whoopConnection = await getOAuthConnection({
+			userId: supabaseUserId,
+			provider: "whoop",
+		});
+
+		if (whoopConnection) {
+			const url = new URL(returnTo, origin);
+			url.searchParams.set("integration", "oura");
+			url.searchParams.set("status", "error");
+			url.searchParams.set(
+				"message",
+				"Disconnect WHOOP before connecting Oura."
+			);
+			return NextResponse.redirect(url, { status: 303 });
+		}
+
 		const state = generateState(32);
 		const scope = getOuraScopes();
 		const authorizeUrl = buildOuraAuthorizeUrl({ redirectUri, state, scope });

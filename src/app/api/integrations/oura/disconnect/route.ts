@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
-	getRequestOrigin,
+	getCanonicalAppOrigin,
 	getReturnToPath,
 	safeErrorMessage,
 } from "@/lib/integrations/oauth.server";
@@ -15,6 +15,10 @@ import {
 	refreshOuraTokens,
 	revokeOuraAccess,
 } from "@/lib/integrations/oura.server";
+import { purgeOuraUserData } from "@/lib/integrations/oura-storage.server";
+import { purgeOuraSyncArtifacts } from "@/lib/integrations/oura-sync.server";
+
+export const runtime = "nodejs";
 
 function isExpiringSoon(expiresAtIso: string | null, skewSeconds = 0) {
 	if (!expiresAtIso) return true;
@@ -24,7 +28,7 @@ function isExpiringSoon(expiresAtIso: string | null, skewSeconds = 0) {
 }
 
 export async function POST(request: NextRequest) {
-	const origin = getRequestOrigin(request);
+	const origin = getCanonicalAppOrigin(request);
 	const returnTo = getReturnToPath(request) ?? "/dashboard/devices";
 	const { userId } = await auth();
 	if (!userId) {
@@ -63,6 +67,8 @@ export async function POST(request: NextRequest) {
 				// Best-effort revoke; still disconnect locally.
 			}
 
+			await purgeOuraUserData({ userId: supabaseUserId });
+			await purgeOuraSyncArtifacts({ userId: supabaseUserId });
 			await deleteOAuthConnection({ userId: supabaseUserId, provider: "oura" });
 		}
 

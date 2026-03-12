@@ -170,6 +170,22 @@ export async function getOAuthConnection(params: {
 	return (data as OAuthConnectionRow | null) ?? null;
 }
 
+export async function getOAuthConnectionByProviderUserId(params: {
+	provider: OAuthProvider;
+	providerUserId: string;
+}): Promise<OAuthConnectionRow | null> {
+	const supabase = createAdminClient();
+	const { data, error } = await supabase
+		.from("oauth_connections")
+		.select("*")
+		.eq("provider", params.provider)
+		.eq("provider_user_id", params.providerUserId)
+		.maybeSingle();
+
+	if (error) throw error;
+	return (data as OAuthConnectionRow | null) ?? null;
+}
+
 export async function deleteOAuthConnection(params: {
 	userId: string;
 	provider: OAuthProvider;
