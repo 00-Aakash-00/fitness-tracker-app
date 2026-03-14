@@ -32,12 +32,13 @@ function formatDate(value: string | null | undefined): string | null {
 export default async function DevicesPage({
 	searchParams,
 }: {
-	searchParams?: Record<string, string | string[] | undefined>;
+	searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
 	const { userId } = await auth();
 	if (!userId) {
 		redirect("/sign-in");
 	}
+	const resolvedSearchParams = (await searchParams) ?? {};
 
 	let supabaseUserId: string | null = null;
 	try {
@@ -58,14 +59,16 @@ export default async function DevicesPage({
 	]);
 
 	const integration =
-		typeof searchParams?.integration === "string"
-			? searchParams.integration
+		typeof resolvedSearchParams.integration === "string"
+			? resolvedSearchParams.integration
 			: undefined;
 	const status =
-		typeof searchParams?.status === "string" ? searchParams.status : undefined;
+		typeof resolvedSearchParams.status === "string"
+			? resolvedSearchParams.status
+			: undefined;
 	const message =
-		typeof searchParams?.message === "string"
-			? searchParams.message
+		typeof resolvedSearchParams.message === "string"
+			? resolvedSearchParams.message
 			: undefined;
 	const isWhoopBlocked = Boolean(ouraConnection) && !whoopConnection;
 	const isOuraBlocked = Boolean(whoopConnection) && !ouraConnection;

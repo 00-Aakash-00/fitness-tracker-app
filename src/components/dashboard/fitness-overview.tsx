@@ -1,461 +1,449 @@
 "use client";
 
-import { Beef, Flame, Footprints, Utensils, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useOutsideClick } from "@/hooks/use-outside-click";
+import type {
+	DashboardStatusMessage,
+	InsightCard,
+	InsightDetailSection,
+	InsightMetric,
+} from "@/lib/dashboard/wearable-dashboard.types";
+import { cn } from "@/lib/utils";
+import { DashboardIconGlyph } from "./dashboard-icon";
 
-// Types
-interface ActivityItem {
-	activity: string;
-	calories: number;
-	duration: string;
-}
-
-interface HourlyStep {
-	hour: string;
-	steps: number;
-}
-
-interface MealItem {
-	name: string;
-	calories: number;
-	time: string;
-}
-
-interface ProteinSource {
-	name: string;
-	protein: number;
-	time: string;
-}
-
-interface MetricData {
-	id: string;
-	title: string;
-	value: number;
-	goal: number;
-	unit: string;
-	subtitle: string;
-	icon: React.ReactNode;
-	breakdown: ActivityItem[] | HourlyStep[] | MealItem[] | ProteinSource[];
-	breakdownType: "activity" | "hourly" | "meal" | "protein";
-}
-
-// Mock data with detailed breakdowns
-const metricsData: MetricData[] = [
-	{
-		id: "calories-burned",
-		title: "Calories Burned",
-		value: 1847,
-		goal: 2200,
-		unit: "kcal",
-		subtitle: "Active burn today",
-		icon: <Flame className="h-4 w-4" />,
-		breakdownType: "activity",
-		breakdown: [
-			{ activity: "Morning Walk", calories: 320, duration: "45 min" },
-			{ activity: "Gym Workout", calories: 580, duration: "1 hr" },
-			{ activity: "Evening Jog", calories: 420, duration: "30 min" },
-			{ activity: "Daily Movement", calories: 527, duration: "Throughout" },
-		] as ActivityItem[],
+const toneStyles = {
+	boost: {
+		pill: "border-brand-cool/20 bg-brand-cool/10 text-brand-cool",
+		icon: "bg-brand-cool/10 text-brand-cool",
+		accent: "bg-brand-cool",
 	},
-	{
-		id: "steps",
-		title: "Steps",
-		value: 8432,
-		goal: 10000,
-		unit: "steps",
-		subtitle: "Keep moving!",
-		icon: <Footprints className="h-4 w-4" />,
-		breakdownType: "hourly",
-		breakdown: [
-			{ hour: "6 AM", steps: 450 },
-			{ hour: "7 AM", steps: 1200 },
-			{ hour: "8 AM", steps: 890 },
-			{ hour: "9 AM", steps: 320 },
-			{ hour: "10 AM", steps: 540 },
-			{ hour: "11 AM", steps: 680 },
-			{ hour: "12 PM", steps: 920 },
-			{ hour: "1 PM", steps: 450 },
-			{ hour: "2 PM", steps: 380 },
-			{ hour: "3 PM", steps: 720 },
-			{ hour: "4 PM", steps: 560 },
-			{ hour: "5 PM", steps: 1322 },
-		] as HourlyStep[],
+	steady: {
+		pill: "border-border/60 bg-secondary-surface/70 text-secondary-text",
+		icon: "bg-secondary-surface text-secondary-text",
+		accent: "bg-brand-soft",
 	},
-	{
-		id: "calories-eaten",
-		title: "Calories Eaten",
-		value: 1520,
-		goal: 2000,
-		unit: "kcal",
-		subtitle: "Nutrition intake",
-		icon: <Utensils className="h-4 w-4" />,
-		breakdownType: "meal",
-		breakdown: [
-			{ name: "Oatmeal with Berries", calories: 350, time: "8:00 AM" },
-			{ name: "Grilled Chicken Salad", calories: 480, time: "12:30 PM" },
-			{ name: "Protein Shake", calories: 220, time: "3:00 PM" },
-			{ name: "Salmon with Vegetables", calories: 470, time: "7:00 PM" },
-		] as MealItem[],
+	recover: {
+		pill: "border-brand-warm/20 bg-brand-warm/10 text-brand-warm",
+		icon: "bg-brand-warm/10 text-brand-warm",
+		accent: "bg-brand-warm",
 	},
-	{
-		id: "protein",
-		title: "Protein",
-		value: 87,
-		goal: 120,
-		unit: "g",
-		subtitle: "Daily protein goal",
-		icon: <Beef className="h-4 w-4" />,
-		breakdownType: "protein",
-		breakdown: [
-			{ name: "Eggs (3)", protein: 18, time: "8:00 AM" },
-			{ name: "Chicken Breast", protein: 35, time: "12:30 PM" },
-			{ name: "Protein Shake", protein: 24, time: "3:00 PM" },
-			{ name: "Salmon Fillet", protein: 10, time: "7:00 PM" },
-		] as ProteinSource[],
+	neutral: {
+		pill: "border-border/60 bg-secondary-surface/70 text-secondary-text",
+		icon: "bg-secondary-surface text-secondary-text",
+		accent: "bg-border",
 	},
-];
+	warning: {
+		pill: "border-brand-warm/20 bg-brand-warm/10 text-brand-warm",
+		icon: "bg-brand-warm/10 text-brand-warm",
+		accent: "bg-brand-warm",
+	},
+} as const;
 
-// Breakdown content components
-function ActivityBreakdown({ items }: { items: ActivityItem[] }) {
+const metricToneStyles = {
+	good: "text-brand-cool",
+	caution: "text-brand-warm",
+	neutral: "text-primary-text",
+} as const;
+
+const focusableSelector = [
+	"a[href]",
+	"button:not([disabled])",
+	"textarea:not([disabled])",
+	"input:not([disabled])",
+	"select:not([disabled])",
+	"[tabindex]:not([tabindex='-1'])",
+].join(", ");
+
+function DetailSection({ section }: { section: InsightDetailSection }) {
 	return (
-		<div className="space-y-3">
-			{items.map((item) => (
-				<div
-					key={`${item.activity}-${item.duration}`}
-					className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
-				>
-					<div className="flex-1">
-						<p className="text-sm font-medium text-primary-text">
-							{item.activity}
-						</p>
-						<p className="text-xs text-secondary-text">{item.duration}</p>
-					</div>
-					<div className="text-right">
-						<p className="font-geist text-base sm:text-lg font-medium text-primary-text">
-							{item.calories}
-						</p>
-						<p className="text-xs text-secondary-text">kcal</p>
-					</div>
-				</div>
-			))}
+		<section className="space-y-3">
+			<div className="space-y-1">
+				<h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-text">
+					{section.title}
+				</h4>
+				{section.description ? (
+					<p className="text-xs leading-relaxed text-secondary-text">
+						{section.description}
+					</p>
+				) : null}
+			</div>
+			<div className="space-y-2.5">
+				{section.metrics.map((metric) => (
+					<DetailMetric
+						key={`${section.title}-${metric.label}-${metric.value}`}
+						metric={metric}
+					/>
+				))}
+			</div>
+		</section>
+	);
+}
+
+function DetailMetric({ metric }: { metric: InsightMetric }) {
+	return (
+		<div className="flex items-start justify-between gap-4 rounded-lg border border-border/40 bg-secondary-surface/40 px-3 py-2.5">
+			<span className="text-xs text-secondary-text">{metric.label}</span>
+			<span
+				className={cn(
+					"text-right text-sm font-medium",
+					metricToneStyles[metric.tone ?? "neutral"]
+				)}
+			>
+				{metric.value}
+			</span>
 		</div>
 	);
 }
 
-function HourlyBreakdown({ items }: { items: HourlyStep[] }) {
-	const maxSteps = Math.max(...items.map((i) => i.steps));
-
-	return (
-		<div className="space-y-2">
-			{items.map((item) => (
-				<div key={item.hour} className="flex items-center gap-2 sm:gap-3">
-					<span className="text-xs text-secondary-text w-10 sm:w-12 shrink-0">
-						{item.hour}
-					</span>
-					<div className="flex-1 h-2 bg-border/30 rounded-full overflow-hidden">
-						<div
-							className="h-full bg-brand-cool rounded-full transition-all duration-300"
-							style={{ width: `${(item.steps / maxSteps) * 100}%` }}
-						/>
-					</div>
-					<span className="font-geist text-xs sm:text-sm font-medium text-primary-text w-12 sm:w-14 text-right">
-						{item.steps.toLocaleString()}
-					</span>
-				</div>
-			))}
-		</div>
-	);
+function cardModeLabel(mode: InsightCard["mode"]) {
+	if (mode === "preview") return "preview";
+	if (mode === "setup") return "setup";
+	return null;
 }
 
-function MealBreakdown({ items }: { items: MealItem[] }) {
-	return (
-		<div className="space-y-3">
-			{items.map((item) => (
-				<div
-					key={`${item.name}-${item.time}`}
-					className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
-				>
-					<div className="flex-1">
-						<p className="text-sm font-medium text-primary-text">{item.name}</p>
-						<p className="text-xs text-secondary-text">{item.time}</p>
-					</div>
-					<div className="text-right">
-						<p className="font-geist text-base sm:text-lg font-medium text-primary-text">
-							{item.calories}
-						</p>
-						<p className="text-xs text-secondary-text">kcal</p>
-					</div>
-				</div>
-			))}
-		</div>
-	);
-}
-
-function ProteinBreakdown({ items }: { items: ProteinSource[] }) {
-	return (
-		<div className="space-y-3">
-			{items.map((item) => (
-				<div
-					key={`${item.name}-${item.time}`}
-					className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
-				>
-					<div className="flex-1">
-						<p className="text-sm font-medium text-primary-text">{item.name}</p>
-						<p className="text-xs text-secondary-text">{item.time}</p>
-					</div>
-					<div className="text-right">
-						<p className="font-geist text-base sm:text-lg font-medium text-primary-text">
-							{item.protein}g
-						</p>
-						<p className="text-xs text-secondary-text">protein</p>
-					</div>
-				</div>
-			))}
-		</div>
-	);
-}
-
-function BreakdownContent({ metric }: { metric: MetricData }) {
-	switch (metric.breakdownType) {
-		case "activity":
-			return <ActivityBreakdown items={metric.breakdown as ActivityItem[]} />;
-		case "hourly":
-			return <HourlyBreakdown items={metric.breakdown as HourlyStep[]} />;
-		case "meal":
-			return <MealBreakdown items={metric.breakdown as MealItem[]} />;
-		case "protein":
-			return <ProteinBreakdown items={metric.breakdown as ProteinSource[]} />;
-		default:
-			return null;
+function cardValueClass(mode: InsightCard["mode"]) {
+	if (mode === "preview") {
+		return "text-2xl leading-tight sm:text-[2rem]";
 	}
+
+	if (mode === "setup") {
+		return "text-[1.7rem] leading-tight sm:text-[2.1rem]";
+	}
+
+	return "text-3xl sm:text-4xl";
 }
 
-export function FitnessOverview({ stepGoal }: { stepGoal?: number }) {
-	const [active, setActive] = useState<MetricData | null>(null);
+export function FitnessOverview({
+	providerLabel,
+	lastSyncedLabel,
+	status,
+	cards,
+}: {
+	providerLabel: string;
+	lastSyncedLabel: string;
+	status: DashboardStatusMessage;
+	cards: InsightCard[];
+}) {
+	const [active, setActive] = useState<InsightCard | null>(null);
 	const ref = useRef<HTMLDivElement>(null);
+	const closeButtonRef = useRef<HTMLButtonElement>(null);
+	const activeTriggerRef = useRef<HTMLButtonElement | null>(null);
 	const id = useId();
+	const prefersReducedMotion = useReducedMotion();
+	const modalTransition = prefersReducedMotion
+		? { duration: 0 }
+		: { type: "spring" as const, stiffness: 280, damping: 28 };
 
-	const metrics = useMemo(() => {
-		if (!stepGoal) return metricsData;
-		return metricsData.map((metric) =>
-			metric.id === "steps" ? { ...metric, goal: stepGoal } : metric
-		);
-	}, [stepGoal]);
+	const closeModal = useCallback(() => {
+		setActive(null);
+	}, []);
 
 	useEffect(() => {
+		if (!active) {
+			document.body.style.overflow = "auto";
+			if (activeTriggerRef.current) {
+				requestAnimationFrame(() => {
+					activeTriggerRef.current?.focus();
+				});
+			}
+			return;
+		}
+
+		document.body.style.overflow = "hidden";
+		requestAnimationFrame(() => {
+			closeButtonRef.current?.focus();
+		});
+
 		function onKeyDown(event: KeyboardEvent) {
 			if (event.key === "Escape") {
-				setActive(null);
+				event.preventDefault();
+				closeModal();
+				return;
+			}
+
+			if (event.key !== "Tab" || !ref.current) {
+				return;
+			}
+
+			const focusable = Array.from(
+				ref.current.querySelectorAll<HTMLElement>(focusableSelector)
+			);
+			if (focusable.length === 0) {
+				event.preventDefault();
+				return;
+			}
+
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			const activeElement = document.activeElement;
+
+			if (event.shiftKey && activeElement === first) {
+				event.preventDefault();
+				last.focus();
+			} else if (!event.shiftKey && activeElement === last) {
+				event.preventDefault();
+				first.focus();
 			}
 		}
 
-		if (active) {
-			document.body.style.overflow = "hidden";
-		} else {
-			document.body.style.overflow = "auto";
-		}
-
 		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [active]);
+		return () => {
+			document.body.style.overflow = "auto";
+			window.removeEventListener("keydown", onKeyDown);
+		};
+	}, [active, closeModal]);
 
-	useOutsideClick(ref, () => setActive(null));
+	useOutsideClick(ref, closeModal);
 
 	return (
 		<div className="w-full space-y-6">
-			{/* Header */}
-			<div className="flex items-center justify-between">
-				<h2 className="text-lg sm:text-xl tracking-tight font-semibold text-primary-text">
-					Today&apos;s{" "}
-					<span className="font-accent italic text-brand-cool">Snapshot</span>
-				</h2>
-				<p className="text-xs text-secondary-text font-light">
-					Last synced: Just now
+			<div className="flex items-center justify-between gap-4">
+				<div>
+					<h2 className="text-lg sm:text-xl tracking-tight font-semibold text-primary-text">
+						{providerLabel}{" "}
+						<span className="font-accent italic text-brand-cool">
+							Insight Snapshot
+						</span>
+					</h2>
+					<p className="mt-1 text-xs text-secondary-text">
+						Recovery, sleep, load, and physiology translated into a cleaner
+						operating view.
+					</p>
+				</div>
+				<p className="text-xs font-light text-secondary-text">
+					{lastSyncedLabel}
 				</p>
 			</div>
 
-			{/* Backdrop */}
+			<div
+				className={cn(
+					"rounded-xl border px-4 py-4 sm:px-5",
+					toneStyles[status.tone].pill
+				)}
+			>
+				<div className="flex items-start gap-3">
+					<div
+						className={cn(
+							"flex h-10 w-10 shrink-0 items-center justify-center rounded-full border",
+							toneStyles[status.tone].pill
+						)}
+					>
+						<DashboardIconGlyph
+							icon={status.tone === "recover" ? "shield" : "spark"}
+							className="h-4 w-4"
+						/>
+					</div>
+					<div className="space-y-1">
+						<p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-secondary-text">
+							{status.eyebrow}
+						</p>
+						<h3 className="text-sm font-semibold text-primary-text">
+							{status.title}
+						</h3>
+						<p className="text-xs leading-relaxed text-secondary-text">
+							{status.description}
+						</p>
+					</div>
+				</div>
+			</div>
+
 			<AnimatePresence>
-				{active && (
-					<motion.div
+				{active ? (
+					<motion.button
+						type="button"
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
-						className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+						transition={modalTransition}
+						className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+						onClick={closeModal}
+						aria-label="Close insight detail"
 					/>
-				)}
+				) : null}
 			</AnimatePresence>
 
-			{/* Expanded Card Modal */}
-			{active && (
-				<div className="fixed inset-0 grid place-items-center z-50 p-4">
-					<motion.button
-						key={`button-${active.id}-${id}`}
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={{ opacity: 0, transition: { duration: 0.05 } }}
-						className="absolute top-4 right-4 lg:hidden flex items-center justify-center bg-primary-surface rounded-full h-8 w-8 shadow-md z-10"
-						onClick={() => setActive(null)}
-					>
-						<X className="h-4 w-4 text-primary-text" />
-					</motion.button>
-
+			{active ? (
+				<div className="fixed inset-0 z-50 grid place-items-center p-4">
 					<motion.div
 						layoutId={`card-${active.id}-${id}`}
 						ref={ref}
-						transition={{ type: "spring", stiffness: 300, damping: 30 }}
-						className="w-full max-w-md bg-primary-surface rounded-2xl shadow-xl overflow-hidden border border-border/40"
+						transition={modalTransition}
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby={`insight-title-${active.id}-${id}`}
+						className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border/40 bg-primary-surface shadow-xl"
 					>
-						{/* Card Header */}
-						<div className="p-4 sm:p-5 border-b border-border/30">
-							<div className="flex items-start justify-between mb-4">
-								<motion.p
-									layoutId={`title-${active.id}-${id}`}
-									transition={{ type: "spring", stiffness: 300, damping: 30 }}
-									className="text-sm font-medium tracking-tight text-secondary-text"
-								>
-									{active.title}
-								</motion.p>
-								<motion.div
-									layoutId={`icon-${active.id}-${id}`}
-									transition={{ type: "spring", stiffness: 300, damping: 30 }}
-									className="text-secondary-text/70"
-								>
-									{active.icon}
-								</motion.div>
-							</div>
-
-							<div className="mb-1">
-								<motion.span
-									layoutId={`value-${active.id}-${id}`}
-									transition={{ type: "spring", stiffness: 300, damping: 30 }}
-									className="font-geist text-3xl sm:text-4xl lg:text-5xl font-normal tracking-tighter text-primary-text"
-								>
-									{active.value.toLocaleString()}
-								</motion.span>
-								<span className="text-secondary-text/60 text-base sm:text-lg font-light ml-1">
-									/
-								</span>
-								<span className="text-secondary-text/60 text-base sm:text-lg font-light">
-									{active.goal.toLocaleString()}
-								</span>
-								<span className="text-xs text-secondary-text font-light ml-1.5">
-									{active.unit}
-								</span>
-							</div>
-
-							<p className="text-xs text-secondary-text font-light">
-								{active.subtitle}
-							</p>
-
-							{/* Progress bar */}
-							<div className="mt-3 flex items-center gap-2">
-								<div className="flex-1 h-1 bg-border/50 rounded-full overflow-hidden">
-									<motion.div
-										className="h-full bg-brand-cool rounded-full"
-										initial={{ width: 0 }}
-										animate={{
-											width: `${Math.min((active.value / active.goal) * 100, 100)}%`,
-										}}
-										transition={{ duration: 0.5, ease: "easeOut" }}
-									/>
+						<div className="border-b border-border/30 px-4 py-4 sm:px-6 sm:py-5">
+							<div className="flex items-start justify-between gap-4">
+								<div className="space-y-3">
+									<div className="flex flex-wrap items-center gap-2">
+										<span
+											className={cn(
+												"inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]",
+												toneStyles[active.tone].pill
+											)}
+										>
+											{active.statusLabel}
+										</span>
+										{cardModeLabel(active.mode) ? (
+											<span className="inline-flex items-center rounded-full border border-border/50 bg-secondary-surface/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-secondary-text">
+												{cardModeLabel(active.mode)}
+											</span>
+										) : null}
+										<span className="text-[10px] uppercase tracking-[0.18em] text-secondary-text">
+											{active.title}
+										</span>
+									</div>
+									<div>
+										<h3
+											id={`insight-title-${active.id}-${id}`}
+											className={cn(
+												"font-medium tracking-tight text-primary-text",
+												cardValueClass(active.mode),
+												active.mode === "live" ? "text-2xl sm:text-3xl" : ""
+											)}
+										>
+											{active.value}
+											{active.unit ? (
+												<span className="ml-2 text-sm font-normal text-secondary-text">
+													{active.unit}
+												</span>
+											) : null}
+										</h3>
+										{active.supportingValue ? (
+											<p className="mt-1 text-sm text-secondary-text">
+												{active.supportingValue}
+											</p>
+										) : null}
+									</div>
+									<p className="max-w-xl text-sm leading-relaxed text-secondary-text">
+										{active.summary}
+									</p>
 								</div>
-								<span className="text-xs font-medium text-secondary-text">
-									{Math.round((active.value / active.goal) * 100)}%
-								</span>
+
+								<div className="flex items-start gap-3">
+									<div
+										className={cn(
+											"hidden h-12 w-12 shrink-0 items-center justify-center rounded-full md:flex",
+											toneStyles[active.tone].icon
+										)}
+									>
+										<DashboardIconGlyph
+											icon={active.icon}
+											className="h-5 w-5"
+										/>
+									</div>
+									<button
+										ref={closeButtonRef}
+										type="button"
+										className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/40 bg-primary-surface text-primary-text transition-colors hover:bg-secondary-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cool focus-visible:ring-offset-2"
+										onClick={closeModal}
+										aria-label="Close insight detail"
+									>
+										<X className="h-4 w-4" />
+									</button>
+								</div>
 							</div>
 						</div>
 
-						{/* Breakdown Content */}
-						<motion.div
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							className="p-4 sm:p-5 max-h-[50vh] overflow-y-auto"
-						>
-							<p className="text-xs font-medium text-secondary-text uppercase tracking-wider mb-4">
-								Breakdown
-							</p>
-							<BreakdownContent metric={active} />
-						</motion.div>
+						<div className="max-h-[60vh] space-y-6 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+							{active.detailSections.map((section) => (
+								<DetailSection
+									key={`${active.id}-${section.title}`}
+									section={section}
+								/>
+							))}
+						</div>
 					</motion.div>
 				</div>
-			)}
+			) : null}
 
-			{/* Metric Cards Grid */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-				{metrics.map((metric) => {
-					const percentage = Math.round((metric.value / metric.goal) * 100);
-					const isActive = active?.id === metric.id;
-
+			<div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+				{cards.map((card) => {
+					const tone = toneStyles[card.tone];
 					return (
-						<motion.div
-							key={metric.id}
-							layoutId={`card-${metric.id}-${id}`}
-							onClick={() => !isActive && setActive(metric)}
-							transition={{ type: "spring", stiffness: 300, damping: 30 }}
-							className={`p-4 sm:p-5 rounded-xl bg-primary-surface border border-border/40 cursor-pointer transition-shadow duration-300 hover:shadow-md group ${isActive ? "opacity-0 pointer-events-none" : ""}`}
+						<motion.button
+							key={card.id}
+							type="button"
+							layoutId={`card-${card.id}-${id}`}
+							onClick={(event) => {
+								activeTriggerRef.current = event.currentTarget;
+								setActive(card);
+							}}
+							transition={modalTransition}
+							className="group relative overflow-hidden rounded-xl border border-border/40 bg-primary-surface p-4 text-left shadow-sm transition-shadow duration-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cool focus-visible:ring-offset-2"
 						>
-							<div className="relative">
-								{/* Header */}
-								<div className="flex items-start justify-between mb-3 sm:mb-4">
-									<motion.p
-										layoutId={`title-${metric.id}-${id}`}
-										transition={{ type: "spring", stiffness: 300, damping: 30 }}
-										className="text-sm font-medium tracking-tight text-secondary-text"
-									>
-										{metric.title}
-									</motion.p>
-									<motion.div
-										layoutId={`icon-${metric.id}-${id}`}
-										transition={{ type: "spring", stiffness: 300, damping: 30 }}
-										className="text-secondary-text/70 transition-transform duration-200 group-hover:scale-110"
-									>
-										{metric.icon}
-									</motion.div>
-								</div>
-
-								{/* Value */}
-								<div className="mb-1">
-									<motion.span
-										layoutId={`value-${metric.id}-${id}`}
-										transition={{ type: "spring", stiffness: 300, damping: 30 }}
-										className="font-geist text-3xl sm:text-4xl lg:text-5xl font-normal tracking-tighter text-primary-text"
-									>
-										{metric.value.toLocaleString()}
-									</motion.span>
-									<span className="text-secondary-text/60 text-base sm:text-lg font-light ml-1">
-										/
-									</span>
-									<span className="text-secondary-text/60 text-base sm:text-lg font-light">
-										{metric.goal.toLocaleString()}
-									</span>
-									<span className="text-xs text-secondary-text font-light ml-1.5">
-										{metric.unit}
-									</span>
-								</div>
-
-								{/* Subtitle */}
-								<p className="text-xs text-secondary-text font-light">
-									{metric.subtitle}
-								</p>
-
-								{/* Progress indicator */}
-								<div className="mt-3 flex items-center gap-2">
-									<div className="flex-1 h-1 bg-border/50 rounded-full overflow-hidden">
-										<div
-											className="h-full bg-brand-cool rounded-full transition-all duration-500"
-											style={{ width: `${Math.min(percentage, 100)}%` }}
-										/>
+							<div
+								className={cn(
+									"absolute inset-x-0 top-0 h-0.5 opacity-90",
+									tone.accent
+								)}
+							/>
+							<div className="space-y-4">
+								<div className="flex items-start justify-between gap-3">
+									<div className="space-y-2">
+										<div className="flex flex-wrap items-center gap-2">
+											<span
+												className={cn(
+													"inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]",
+													tone.pill
+												)}
+											>
+												{card.statusLabel}
+											</span>
+											{cardModeLabel(card.mode) ? (
+												<span className="inline-flex items-center rounded-full border border-border/50 bg-secondary-surface/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-secondary-text">
+													{cardModeLabel(card.mode)}
+												</span>
+											) : null}
+										</div>
+										<p className="text-sm font-medium tracking-tight text-secondary-text">
+											{card.title}
+										</p>
 									</div>
-									<span className="text-xs font-medium text-secondary-text">
-										{percentage}%
-									</span>
+									<div
+										className={cn(
+											"flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-110",
+											tone.icon
+										)}
+									>
+										<DashboardIconGlyph icon={card.icon} className="h-4 w-4" />
+									</div>
+								</div>
+
+								<div>
+									<p
+										className={cn(
+											"font-geist font-normal tracking-tighter text-primary-text",
+											cardValueClass(card.mode)
+										)}
+									>
+										{card.value}
+										{card.unit ? (
+											<span className="ml-1.5 text-xs font-light text-secondary-text">
+												{card.unit}
+											</span>
+										) : null}
+									</p>
+									{card.supportingValue ? (
+										<p className="mt-1 text-sm text-secondary-text">
+											{card.supportingValue}
+										</p>
+									) : null}
+								</div>
+
+								<div className="space-y-2">
+									<p className="min-h-[3rem] text-xs leading-relaxed text-secondary-text">
+										{card.summary}
+									</p>
+									<p className="text-[11px] text-secondary-text/80">
+										{card.caption}
+									</p>
 								</div>
 							</div>
-						</motion.div>
+						</motion.button>
 					);
 				})}
 			</div>

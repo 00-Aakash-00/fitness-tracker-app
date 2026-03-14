@@ -1,14 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
-import {
-	FitnessDeviceCarousel,
-	type FitnessDeviceConnection,
-} from "@/components/dashboard/fitness-device-carousel";
 import { FitnessOverview } from "@/components/dashboard/fitness-overview";
+import { NextBestActions } from "@/components/dashboard/next-best-actions";
 import { QuickAssist } from "@/components/dashboard/quick-assist";
 import { TopIntro } from "@/components/dashboard/top-intro";
+import { WearableConnectionPanel } from "@/components/dashboard/wearable-connection-panel";
 import { WeeklyActivitySummary } from "@/components/dashboard/weekly-activity-summary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getDashboardWearableContext } from "@/lib/dashboard/wearable-dashboard.server";
 import {
 	getOAuthConnection,
 	getSupabaseUserIdByClerkId,
@@ -20,48 +19,27 @@ import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
 export default async function DashboardPage({
 	searchParams,
 }: {
-	searchParams?: Record<string, string | string[] | undefined>;
+	searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
 	const [{ userId }, cookieStore] = await Promise.all([auth(), cookies()]);
+	const resolvedSearchParams = (await searchParams) ?? {};
 	const stepGoal = parseStepGoal(cookieStore.get(STEP_GOAL_COOKIE)?.value);
 	const isWhoopAvailable = isWhoopConfigured();
 	const isOuraAvailable = isOuraConfigured();
 	const integration =
-		typeof searchParams?.integration === "string"
-			? searchParams.integration
+		typeof resolvedSearchParams.integration === "string"
+			? resolvedSearchParams.integration
 			: undefined;
 	const status =
-		typeof searchParams?.status === "string" ? searchParams.status : undefined;
-	const message =
-		typeof searchParams?.message === "string"
-			? searchParams.message
+		typeof resolvedSearchParams.status === "string"
+			? resolvedSearchParams.status
 			: undefined;
-	const deviceDefinitions: Array<
-		Pick<FitnessDeviceConnection, "id" | "type" | "deviceName" | "image"> & {
-			isAvailable: boolean;
-		}
-	> = [
-		{
-			id: "whoop",
-			type: "whoop",
-			deviceName: "WHOOP",
-			image: "/whoop.png",
-			isAvailable: isWhoopAvailable,
-		},
-		{
-			id: "oura",
-			type: "oura",
-			deviceName: "Oura",
-			image: "/oura.png",
-			isAvailable: isOuraAvailable,
-		},
-	];
-	let devices: FitnessDeviceConnection[] = deviceDefinitions.map(
-		({ isAvailable, ...device }) => ({
-			...device,
-			status: isAvailable ? "not_connected" : "unavailable",
-		})
-	);
+	const message =
+		typeof resolvedSearchParams.message === "string"
+			? resolvedSearchParams.message
+			: undefined;
+	let whoopConnected = false;
+	let ouraConnected = false;
 
 	if (userId && (isWhoopAvailable || isOuraAvailable)) {
 		try {
@@ -75,37 +53,23 @@ export default async function DashboardPage({
 					: Promise.resolve(null),
 			]);
 
-			devices = [
-				{
-					id: "whoop",
-					type: "whoop",
-					deviceName: "WHOOP",
-					status: !isWhoopAvailable
-						? "unavailable"
-						: whoopConnection
-							? "connected"
-							: "not_connected",
-					image: "/whoop.png",
-				},
-				{
-					id: "oura",
-					type: "oura",
-					deviceName: "Oura",
-					status: !isOuraAvailable
-						? "unavailable"
-						: ouraConnection
-							? "connected"
-							: "not_connected",
-					image: "/oura.png",
-				},
-			];
+			whoopConnected = Boolean(whoopConnection);
+			ouraConnected = Boolean(ouraConnection);
 		} catch {
-			devices = deviceDefinitions.map(({ isAvailable, ...device }) => ({
-				...device,
-				status: isAvailable ? "not_connected" : "unavailable",
-			}));
+			whoopConnected = false;
+			ouraConnected = false;
 		}
 	}
+
+	const dashboardContext = await getDashboardWearableContext({
+		stepGoal,
+		connections: {
+			isWhoopAvailable,
+			isOuraAvailable,
+			whoopConnected,
+			ouraConnected,
+		},
+	});
 
 	return (
 		<div className="min-h-[calc(100vh-4rem)] space-y-10 lg:space-y-14">
@@ -141,8 +105,18 @@ export default async function DashboardPage({
 			<div className="flex flex-col gap-8 lg:flex-row">
 				{/* Left Panel - 1/3 */}
 				<div className="w-full lg:w-1/3 flex flex-col gap-8 pt-8">
-					<TopIntro />
-					<QuickAssist />
+					<TopIntro
+						headline={dashboardContext.headline}
+						highlight={dashboardContext.highlight}
+						description={dashboardContext.description}
+						providerLabel={dashboardContext.providerLabel}
+						actions={dashboardContext.heroActions}
+					/>
+					<NextBestActions
+						actions={dashboardContext.actions}
+						state={dashboardContext.state}
+					/>
+					{dashboardContext.showQuickAssist ? <QuickAssist /> : null}
 				</div>
 
 				{/* Vertical Separator */}
@@ -150,14 +124,23 @@ export default async function DashboardPage({
 
 				{/* Right Panel - 2/3 */}
 				<div className="flex-1 flex items-start pt-2 lg:pt-14">
-					<FitnessOverview stepGoal={stepGoal} />
+					<FitnessOverview
+						providerLabel={dashboardContext.providerLabel}
+						lastSyncedLabel={dashboardContext.lastSyncedLabel}
+						status={dashboardContext.status}
+						cards={dashboardContext.cards}
+					/>
 				</div>
 			</div>
 
 			{/* Bottom Row - Weekly activity + device connections */}
 			<div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] lg:items-start">
-				<WeeklyActivitySummary />
-				<FitnessDeviceCarousel devices={devices} />
+				<WeeklyActivitySummary
+					state={dashboardContext.state}
+					trend={dashboardContext.trend}
+					journeySteps={dashboardContext.journeySteps}
+				/>
+				<WearableConnectionPanel panel={dashboardContext.connectionPanel} />
 			</div>
 		</div>
 	);
