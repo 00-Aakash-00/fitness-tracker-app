@@ -508,7 +508,8 @@ async function performWhoopApiRequest(
 }
 
 function getWhoopApiUrl(pathname: string): URL {
-	return new URL(pathname, WHOOP_API_BASE_URL);
+	const normalizedPath = pathname.replace(/^\/+/, "");
+	return new URL(normalizedPath, `${WHOOP_API_BASE_URL}/`);
 }
 
 function parseCycleScore(value: unknown): WhoopCycleScore | null {
