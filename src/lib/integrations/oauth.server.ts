@@ -154,10 +154,11 @@ export function safeErrorMessage(error: unknown): string {
 
 export function requireEnv(name: string): string {
 	const value = process.env[name];
-	if (!value) {
+	const trimmed = value?.trim();
+	if (!trimmed) {
 		throw new Error(`Missing required environment variable: ${name}`);
 	}
-	return value;
+	return trimmed;
 }
 
 export function hasRequiredEnv(names: string[]): boolean {

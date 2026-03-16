@@ -201,7 +201,10 @@ export default async function DevicesPage({
 								</Button>
 							) : (
 								<Button asChild>
-									<Link href="/api/integrations/whoop/authorize?returnTo=/dashboard/devices">
+									<Link
+										href="/api/integrations/whoop/authorize?returnTo=/dashboard/devices"
+										prefetch={false}
+									>
 										Connect
 									</Link>
 								</Button>
@@ -295,7 +298,10 @@ export default async function DevicesPage({
 								</Button>
 							) : (
 								<Button asChild>
-									<Link href="/api/integrations/oura/authorize?returnTo=/dashboard/devices">
+									<Link
+										href="/api/integrations/oura/authorize?returnTo=/dashboard/devices"
+										prefetch={false}
+									>
 										Connect
 									</Link>
 								</Button>
