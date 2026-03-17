@@ -330,7 +330,7 @@ export async function GET(request: NextRequest) {
 
 		after(() => {
 			processPendingWhoopSyncJobs({
-				limit: 6,
+				limit: 10,
 				workerId: `whoop-callback-${supabaseUserId}`,
 			}).catch((error) => {
 				logWearableRouteError({

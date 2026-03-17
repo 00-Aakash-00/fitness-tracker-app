@@ -2,25 +2,22 @@ import type { NextRequest } from "next/server";
 import {
 	enqueueRollingOuraReconcileJobs,
 	ensureOuraWebhookSubscriptions,
-	processPendingOuraSyncJobs,
 	recoverStaleOuraSyncJobs,
 } from "@/lib/integrations/oura-sync.server";
 import {
 	jsonNoStore,
 	logWearableRouteError,
 } from "@/lib/integrations/wearable-route-errors.server";
-import {
-	authorizeOuraSyncRequest,
-	buildOuraSyncWorkerId,
-	ensureOuraSyncConfigured,
-	syncErrorResponse,
-} from "./shared";
+import { authorizeOuraSyncRequest, ensureOuraSyncConfigured } from "../shared";
 
 export const runtime = "nodejs";
 
 async function handleRequest(request: NextRequest) {
 	try {
-		const authorizationError = authorizeOuraSyncRequest(request, "sync");
+		const authorizationError = authorizeOuraSyncRequest(
+			request,
+			"sync/maintenance"
+		);
 		if (authorizationError) {
 			return authorizationError;
 		}
@@ -30,12 +27,7 @@ async function handleRequest(request: NextRequest) {
 			return configurationError;
 		}
 
-		const rawLimit = request.nextUrl.searchParams.get("limit");
-		const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : NaN;
-		const limit = Number.isFinite(parsedLimit) ? Math.max(1, parsedLimit) : 25;
-		const workerId = buildOuraSyncWorkerId("cron");
 		const errors: string[] = [];
-
 		let recoveredJobs = 0;
 		let ensuredSubscriptions = 0;
 		let enqueuedReconciles = 0;
@@ -70,39 +62,18 @@ async function handleRequest(request: NextRequest) {
 			);
 		}
 
-		let processedJobs = {
-			claimed: 0,
-			completed: 0,
-			rescheduled: 0,
-			failed: 0,
-		};
-
-		try {
-			processedJobs = await processPendingOuraSyncJobs({
-				limit,
-				workerId,
-			});
-		} catch (error) {
-			errors.push(
-				error instanceof Error
-					? `process_jobs: ${error.message}`
-					: "process_jobs: unexpected error"
-			);
-		}
-
 		return jsonNoStore(
 			{
 				ok: errors.length === 0,
 				...(errors.length > 0
 					? {
 							code: "partial_failure",
-							message: "Oura sync completed with errors.",
+							message: "Oura sync maintenance completed with errors.",
 						}
 					: {}),
 				recoveredJobs,
 				ensuredSubscriptions,
 				enqueuedReconciles,
-				processedJobs,
 				errors,
 			},
 			{
@@ -112,15 +83,20 @@ async function handleRequest(request: NextRequest) {
 	} catch (error) {
 		logWearableRouteError({
 			error,
-			phase: "handle_request",
+			phase: "handle_request:maintenance",
 			provider: "oura",
 			route: "sync",
 		});
-		return syncErrorResponse({
-			code: "unexpected_error",
-			message: "Unexpected Oura sync route failure.",
-			status: 500,
-		});
+		return jsonNoStore(
+			{
+				ok: false,
+				code: "unexpected_error",
+				message: "Unexpected Oura sync maintenance route failure.",
+			},
+			{
+				status: 500,
+			}
+		);
 	}
 }
 

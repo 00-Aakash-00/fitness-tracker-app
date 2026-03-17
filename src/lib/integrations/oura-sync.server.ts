@@ -120,6 +120,11 @@ type ProcessJobsResult = {
 
 type JobProcessResult = "completed" | "rescheduled";
 
+type ClaimJobFilters = {
+	syncKinds?: OuraSyncKind[];
+	minPriority?: number;
+};
+
 function isRecord(value: unknown): value is JsonRecord {
 	return typeof value === "object" && value !== null;
 }
@@ -399,14 +404,27 @@ async function failJob(job: OuraSyncJobRow, error: unknown): Promise<void> {
 	});
 }
 
-async function claimNextJob(workerId: string): Promise<OuraSyncJobRow | null> {
+async function claimNextJob(
+	workerId: string,
+	filters?: ClaimJobFilters
+): Promise<OuraSyncJobRow | null> {
 	const supabase = createAdminClient();
 	const nowIso = new Date().toISOString();
-	const { data, error } = await supabase
+	let query = supabase
 		.from("oura_sync_jobs")
 		.select("*")
 		.eq("status", "pending")
-		.lte("available_at", nowIso)
+		.lte("available_at", nowIso);
+
+	if (typeof filters?.minPriority === "number") {
+		query = query.gte("priority", filters.minPriority);
+	}
+
+	if (filters?.syncKinds?.length) {
+		query = query.in("sync_kind", filters.syncKinds);
+	}
+
+	const { data, error } = await query
 		.order("priority", { ascending: false })
 		.order("created_at", { ascending: true })
 		.limit(10);
@@ -1620,6 +1638,8 @@ export async function ensureOuraWebhookSubscriptions(): Promise<number> {
 export async function processPendingOuraSyncJobs(params?: {
 	limit?: number;
 	workerId?: string;
+	syncKinds?: OuraSyncKind[];
+	minPriority?: number;
 }): Promise<ProcessJobsResult> {
 	const result: ProcessJobsResult = {
 		claimed: 0,
@@ -1632,7 +1652,10 @@ export async function processPendingOuraSyncJobs(params?: {
 		params?.workerId ?? `oura-sync-${process.pid}-${Date.now().toString(36)}`;
 
 	for (let index = 0; index < limit; index += 1) {
-		const job = await claimNextJob(workerId);
+		const job = await claimNextJob(workerId, {
+			syncKinds: params?.syncKinds,
+			minPriority: params?.minPriority,
+		});
 		if (!job) {
 			break;
 		}

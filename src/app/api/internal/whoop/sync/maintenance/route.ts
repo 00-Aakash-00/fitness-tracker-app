@@ -6,21 +6,21 @@ import {
 import {
 	enqueueRollingWhoopReconcileJobs,
 	enqueueRollingWhoopRefreshJobs,
-	processPendingWhoopSyncJobs,
 	recoverStaleWhoopSyncJobs,
 } from "@/lib/integrations/whoop-sync.server";
 import {
 	authorizeWhoopSyncRequest,
-	buildWhoopSyncWorkerId,
 	ensureWhoopSyncConfigured,
-	syncErrorResponse,
-} from "./shared";
+} from "../shared";
 
 export const runtime = "nodejs";
 
 async function handleRequest(request: NextRequest) {
 	try {
-		const authorizationError = authorizeWhoopSyncRequest(request, "sync");
+		const authorizationError = authorizeWhoopSyncRequest(
+			request,
+			"sync/maintenance"
+		);
 		if (authorizationError) {
 			return authorizationError;
 		}
@@ -30,12 +30,7 @@ async function handleRequest(request: NextRequest) {
 			return configurationError;
 		}
 
-		const rawLimit = request.nextUrl.searchParams.get("limit");
-		const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : NaN;
-		const limit = Number.isFinite(parsedLimit) ? Math.max(1, parsedLimit) : 25;
-		const workerId = buildWhoopSyncWorkerId("cron");
 		const errors: string[] = [];
-
 		let recoveredJobs = 0;
 		let enqueuedRefreshes = 0;
 		let enqueuedReconciles = 0;
@@ -70,39 +65,18 @@ async function handleRequest(request: NextRequest) {
 			);
 		}
 
-		let processedJobs = {
-			claimed: 0,
-			completed: 0,
-			rescheduled: 0,
-			failed: 0,
-		};
-
-		try {
-			processedJobs = await processPendingWhoopSyncJobs({
-				limit,
-				workerId,
-			});
-		} catch (error) {
-			errors.push(
-				error instanceof Error
-					? `process_jobs: ${error.message}`
-					: "process_jobs: unexpected error"
-			);
-		}
-
 		return jsonNoStore(
 			{
 				ok: errors.length === 0,
 				...(errors.length > 0
 					? {
 							code: "partial_failure",
-							message: "WHOOP sync completed with errors.",
+							message: "WHOOP sync maintenance completed with errors.",
 						}
 					: {}),
 				recoveredJobs,
 				enqueuedRefreshes,
 				enqueuedReconciles,
-				processedJobs,
 				errors,
 			},
 			{
@@ -112,15 +86,20 @@ async function handleRequest(request: NextRequest) {
 	} catch (error) {
 		logWearableRouteError({
 			error,
-			phase: "handle_request",
+			phase: "handle_request:maintenance",
 			provider: "whoop",
 			route: "sync",
 		});
-		return syncErrorResponse({
-			code: "unexpected_error",
-			message: "Unexpected WHOOP sync route failure.",
-			status: 500,
-		});
+		return jsonNoStore(
+			{
+				ok: false,
+				code: "unexpected_error",
+				message: "Unexpected WHOOP sync maintenance route failure.",
+			},
+			{
+				status: 500,
+			}
+		);
 	}
 }
 

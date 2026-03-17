@@ -306,7 +306,7 @@ export async function GET(request: NextRequest) {
 
 		after(() => {
 			processPendingOuraSyncJobs({
-				limit: 6,
+				limit: 12,
 				workerId: `oura-callback-${supabaseUserId}`,
 			}).catch((error) => {
 				logWearableRouteError({

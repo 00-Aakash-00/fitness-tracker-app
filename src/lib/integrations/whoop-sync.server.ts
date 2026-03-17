@@ -94,6 +94,11 @@ type ProcessJobsResult = {
 
 type JobProcessResult = "completed" | "rescheduled";
 
+type ClaimJobFilters = {
+	syncKinds?: WhoopSyncKind[];
+	minPriority?: number;
+};
+
 type WhoopConnectionUserRow = {
 	user_id: string;
 };
@@ -371,14 +376,27 @@ async function failJob(job: WhoopSyncJobRow, error: unknown): Promise<void> {
 	});
 }
 
-async function claimNextJob(workerId: string): Promise<WhoopSyncJobRow | null> {
+async function claimNextJob(
+	workerId: string,
+	filters?: ClaimJobFilters
+): Promise<WhoopSyncJobRow | null> {
 	const supabase = createAdminClient();
 	const nowIso = new Date().toISOString();
-	const { data, error } = await supabase
+	let query = supabase
 		.from("whoop_sync_jobs")
 		.select("*")
 		.eq("status", "pending")
-		.lte("available_at", nowIso)
+		.lte("available_at", nowIso);
+
+	if (typeof filters?.minPriority === "number") {
+		query = query.gte("priority", filters.minPriority);
+	}
+
+	if (filters?.syncKinds?.length) {
+		query = query.in("sync_kind", filters.syncKinds);
+	}
+
+	const { data, error } = await query
 		.order("priority", { ascending: false })
 		.order("created_at", { ascending: true })
 		.limit(10);
@@ -1178,6 +1196,8 @@ export async function recoverStaleWhoopSyncJobs(): Promise<number> {
 export async function processPendingWhoopSyncJobs(params?: {
 	limit?: number;
 	workerId?: string;
+	syncKinds?: WhoopSyncKind[];
+	minPriority?: number;
 }): Promise<ProcessJobsResult> {
 	const result: ProcessJobsResult = {
 		claimed: 0,
@@ -1190,7 +1210,10 @@ export async function processPendingWhoopSyncJobs(params?: {
 		params?.workerId ?? `whoop-sync-${process.pid}-${Date.now().toString(36)}`;
 
 	for (let index = 0; index < limit; index += 1) {
-		const job = await claimNextJob(workerId);
+		const job = await claimNextJob(workerId, {
+			syncKinds: params?.syncKinds,
+			minPriority: params?.minPriority,
+		});
 		if (!job) {
 			break;
 		}
