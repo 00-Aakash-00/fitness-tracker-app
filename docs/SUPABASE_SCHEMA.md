@@ -1433,6 +1433,168 @@ Individual sets per exercise within a workout.
 
 ---
 
+### `public.user_settings`
+
+Stores per-user app preferences (timezone, notification toggles, weekly summary day).
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` (unique, one-to-one) |
+| `timezone` | `text` | YES | - | User's preferred timezone |
+| `reminder_time` | `time` | NO | `'18:00'` | Daily reminder time |
+| `weekly_summary_day` | `text` | NO | `'monday'` | Day for weekly summary |
+| `notify_recovery` | `boolean` | NO | `true` | Recovery notification toggle |
+| `notify_goals` | `boolean` | NO | `true` | Goals notification toggle |
+| `notify_nutrition` | `boolean` | NO | `true` | Nutrition notification toggle |
+| `notify_summaries` | `boolean` | NO | `true` | Summary notification toggle |
+| `notify_devices` | `boolean` | NO | `true` | Device notification toggle |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Check Constraints:**
+- `weekly_summary_day IN ('monday','tuesday','wednesday','thursday','friday','saturday','sunday')`
+
+**Unique Constraints:**
+- `(user_id)` — `user_settings_user_id_key`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `user_settings_pkey` | UNIQUE | `id` |
+| `user_settings_user_id_key` | UNIQUE | `user_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Roles | Command | Condition |
+|-------------|------------|-------|---------|-----------|
+| `Users manage own user_settings` | PERMISSIVE | ALL | ALL | `user_id IN (SELECT id FROM public.users WHERE clerk_id = (auth.jwt() ->> 'sub'))` |
+
+**Triggers:**
+- `update_user_settings_updated_at` — BEFORE UPDATE — `EXECUTE FUNCTION update_updated_at_column()`
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.daily_user_metrics`
+
+Stores aggregated daily metrics per user — wearable data, nutrition, challenges, and sync state.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` |
+| `metric_date` | `date` | NO | - | Date of the metrics |
+| `timezone` | `text` | NO | `'UTC'` | Timezone for the metric day |
+| `active_wearable_provider` | `text` | YES | - | Active wearable provider |
+| `sync_freshness` | `text` | NO | `'not_connected'` | Wearable sync state |
+| `sleep_hours` | `numeric` | YES | - | Total sleep hours |
+| `sleep_score` | `integer` | YES | - | Sleep score |
+| `readiness_score` | `integer` | YES | - | Readiness/recovery score |
+| `steps` | `integer` | YES | - | Step count |
+| `active_calories` | `integer` | YES | - | Active calories burned |
+| `workout_count` | `integer` | NO | `0` | Number of workouts |
+| `workout_duration_minutes` | `integer` | NO | `0` | Total workout duration |
+| `calories_logged` | `integer` | NO | `0` | Calories logged via nutrition |
+| `protein_logged` | `integer` | NO | `0` | Protein logged via nutrition |
+| `calorie_goal_met` | `boolean` | NO | `false` | Whether calorie goal was met |
+| `protein_goal_met` | `boolean` | NO | `false` | Whether protein goal was met |
+| `challenge_tasks_completed` | `integer` | NO | `0` | Challenge tasks completed |
+| `challenge_tasks_target` | `integer` | NO | `0` | Challenge tasks target |
+| `challenge_goal_met` | `boolean` | NO | `false` | Whether challenge goal was met |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Check Constraints:**
+- `active_wearable_provider IN ('oura', 'whoop')`
+- `sync_freshness IN ('not_connected', 'syncing', 'baseline_forming', 'ready', 'stale', 'blocked')`
+
+**Unique Constraints:**
+- `(user_id, metric_date)` — `daily_user_metrics_user_date_key`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `daily_user_metrics_pkey` | UNIQUE | `id` |
+| `daily_user_metrics_user_date_key` | UNIQUE | `user_id, metric_date` |
+| `idx_daily_user_metrics_user_date` | BTREE | `user_id, metric_date DESC` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Roles | Command | Condition |
+|-------------|------------|-------|---------|-----------|
+| `Users manage own daily_user_metrics` | PERMISSIVE | ALL | ALL | `user_id IN (SELECT id FROM public.users WHERE clerk_id = (auth.jwt() ->> 'sub'))` |
+
+**Triggers:**
+- `update_daily_user_metrics_updated_at` — BEFORE UPDATE — `EXECUTE FUNCTION update_updated_at_column()`
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.user_notifications`
+
+Stores in-app notifications with deduplication, read tracking, and expiry support.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` |
+| `type` | `text` | NO | - | Notification type |
+| `title` | `text` | NO | - | Notification title |
+| `body` | `text` | NO | - | Notification body |
+| `cta_label` | `text` | YES | - | Call-to-action button label |
+| `cta_href` | `text` | YES | - | Call-to-action link |
+| `dedupe_key` | `text` | YES | - | Deduplication key |
+| `is_read` | `boolean` | NO | `false` | Read status |
+| `read_at` | `timestamptz` | YES | - | When notification was read |
+| `expires_at` | `timestamptz` | YES | - | Expiry timestamp |
+| `metadata` | `jsonb` | NO | `'{}'` | Additional metadata |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Check Constraints:**
+- `type IN ('sync_complete', 'sync_stale', 'baseline_ready', 'goal_hit', 'goal_missed_risk', 'protein_gap', 'workout_streak', 'recovery_low', 'weekly_summary')`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `user_notifications_pkey` | UNIQUE | `id` |
+| `idx_user_notifications_user_created` | BTREE | `user_id, created_at DESC` |
+| `idx_user_notifications_user_dedupe` | UNIQUE (partial) | `user_id, dedupe_key` WHERE `dedupe_key IS NOT NULL` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Roles | Command | Condition |
+|-------------|------------|-------|---------|-----------|
+| `Users manage own user_notifications` | PERMISSIVE | ALL | ALL | `user_id IN (SELECT id FROM public.users WHERE clerk_id = (auth.jwt() ->> 'sub'))` |
+
+**Triggers:**
+- `update_user_notifications_updated_at` — BEFORE UPDATE — `EXECUTE FUNCTION update_updated_at_column()`
+
+**RLS Enabled:** Yes
+
+---
+
 ## Enums
 
 ### `oura_data_type`
@@ -1701,6 +1863,29 @@ Each Oura data table has:
 | `exercise_sets_pkey` | UNIQUE | `id` |
 | `idx_exercise_sets_workout_exercise` | BTREE | `workout_exercise_id` |
 
+### `public.user_settings`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `user_settings_pkey` | UNIQUE | `id` |
+| `user_settings_user_id_key` | UNIQUE | `user_id` |
+
+### `public.daily_user_metrics`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `daily_user_metrics_pkey` | UNIQUE | `id` |
+| `daily_user_metrics_user_date_key` | UNIQUE | `user_id, metric_date` |
+| `idx_daily_user_metrics_user_date` | BTREE | `user_id, metric_date DESC` |
+
+### `public.user_notifications`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `user_notifications_pkey` | UNIQUE | `id` |
+| `idx_user_notifications_user_created` | BTREE | `user_id, created_at DESC` |
+| `idx_user_notifications_user_dedupe` | UNIQUE (partial) | `user_id, dedupe_key` WHERE `dedupe_key IS NOT NULL` |
+
 ---
 
 ## Row Level Security (RLS) Policies
@@ -1741,6 +1926,14 @@ Each Whoop data table (`whoop_profile`, `whoop_body_measurement`, `whoop_cycles`
 `challenge_tasks`, `daily_completions`, `template_exercises`, `workout_exercises`, `exercise_sets` use cascading ownership checks through their parent tables.
 
 `exercises` has two policies: a SELECT policy allowing system exercises (`user_id IS NULL`) plus user-owned, and an ALL policy for user-owned exercises only.
+
+### App cohesion tables (3 tables)
+
+`user_settings`, `daily_user_metrics`, `user_notifications` use a direct user_id ownership check:
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own {table}` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
 
 ### Server-only tables
 

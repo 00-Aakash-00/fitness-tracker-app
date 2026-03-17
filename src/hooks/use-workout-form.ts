@@ -55,11 +55,6 @@ export function useWorkoutForm({
 		[buildSetFormData]
 	);
 
-	useEffect(() => {
-		commitSets(initialSets);
-		setError(null);
-	}, [commitSets, initialSets]);
-
 	useEffect(
 		() => () => {
 			for (const timer of Object.values(debounceTimers.current)) {

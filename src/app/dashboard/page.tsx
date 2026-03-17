@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { FitnessOverview } from "@/components/dashboard/fitness-overview";
 import { NextBestActions } from "@/components/dashboard/next-best-actions";
 import { QuickAssist } from "@/components/dashboard/quick-assist";
+import { SetupChecklist } from "@/components/dashboard/setup-checklist";
+import { TodayAtAGlancePanel } from "@/components/dashboard/today-at-a-glance";
 import { TopIntro } from "@/components/dashboard/top-intro";
 import { WearableConnectionPanel } from "@/components/dashboard/wearable-connection-panel";
 import { WeeklyActivitySummary } from "@/components/dashboard/weekly-activity-summary";
@@ -15,6 +17,7 @@ import {
 import { isOuraConfigured } from "@/lib/integrations/oura.server";
 import { isWhoopConfigured } from "@/lib/integrations/whoop.server";
 import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
+import { getProgressSnapshot } from "@/lib/progress/progress.server";
 
 export default async function DashboardPage({
 	searchParams,
@@ -38,38 +41,51 @@ export default async function DashboardPage({
 		typeof resolvedSearchParams.message === "string"
 			? resolvedSearchParams.message
 			: undefined;
+	let supabaseUserId: string | null = null;
 	let whoopConnected = false;
 	let ouraConnected = false;
 
-	if (userId && (isWhoopAvailable || isOuraAvailable)) {
+	if (userId) {
 		try {
-			const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-			const [whoopConnection, ouraConnection] = await Promise.all([
-				isWhoopAvailable
-					? getOAuthConnection({ userId: supabaseUserId, provider: "whoop" })
-					: Promise.resolve(null),
-				isOuraAvailable
-					? getOAuthConnection({ userId: supabaseUserId, provider: "oura" })
-					: Promise.resolve(null),
-			]);
+			supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+			if (isWhoopAvailable || isOuraAvailable) {
+				const [whoopConnection, ouraConnection] = await Promise.all([
+					isWhoopAvailable
+						? getOAuthConnection({ userId: supabaseUserId, provider: "whoop" })
+						: Promise.resolve(null),
+					isOuraAvailable
+						? getOAuthConnection({ userId: supabaseUserId, provider: "oura" })
+						: Promise.resolve(null),
+				]);
 
-			whoopConnected = Boolean(whoopConnection);
-			ouraConnected = Boolean(ouraConnection);
+				whoopConnected = Boolean(whoopConnection);
+				ouraConnected = Boolean(ouraConnection);
+			}
 		} catch {
+			supabaseUserId = null;
 			whoopConnected = false;
 			ouraConnected = false;
 		}
 	}
 
-	const dashboardContext = await getDashboardWearableContext({
-		stepGoal,
-		connections: {
-			isWhoopAvailable,
-			isOuraAvailable,
-			whoopConnected,
-			ouraConnected,
-		},
-	});
+	const [dashboardContext, progressSnapshot] = await Promise.all([
+		getDashboardWearableContext({
+			stepGoal,
+			connections: {
+				isWhoopAvailable,
+				isOuraAvailable,
+				whoopConnected,
+				ouraConnected,
+			},
+		}),
+		supabaseUserId
+			? getProgressSnapshot({
+					supabaseUserId,
+					rangeDays: 7,
+					stepGoal,
+				})
+			: Promise.resolve(null),
+	]);
 
 	return (
 		<div className="min-h-[calc(100vh-4rem)] space-y-10 lg:space-y-14">
@@ -101,6 +117,14 @@ export default async function DashboardPage({
 				</Card>
 			) : null}
 
+			{progressSnapshot ? (
+				<TodayAtAGlancePanel glance={progressSnapshot.todayAtAGlance} />
+			) : null}
+
+			{progressSnapshot?.setupChecklist ? (
+				<SetupChecklist items={progressSnapshot.setupChecklist} />
+			) : null}
+
 			{/* Top Row - Main Content */}
 			<div className="flex flex-col gap-8 lg:flex-row">
 				{/* Left Panel - 1/3 */}
@@ -112,10 +136,9 @@ export default async function DashboardPage({
 						providerLabel={dashboardContext.providerLabel}
 						actions={dashboardContext.heroActions}
 					/>
-					<NextBestActions
-						actions={dashboardContext.actions}
-						state={dashboardContext.state}
-					/>
+					{progressSnapshot ? (
+						<NextBestActions action={progressSnapshot.nextBestAction} />
+					) : null}
 					{dashboardContext.showQuickAssist ? <QuickAssist /> : null}
 				</div>
 

@@ -5,6 +5,10 @@ import { getNutritionGoals } from "@/app/dashboard/nutrition/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSupabaseUserIdByClerkId } from "@/lib/integrations/oauth-connections.server";
 import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
+import {
+	DEFAULT_USER_SETTINGS,
+	getUserSettings,
+} from "@/lib/user-settings.server";
 import { NutritionGoalsForm } from "./nutrition-goals-form";
 import { SettingsForm } from "./settings-form";
 
@@ -18,13 +22,19 @@ export default async function SettingsPage() {
 
 	const { userId } = await auth();
 	let nutritionGoals = { dailyCalories: 2000, dailyProtein: 150 };
+	let userSettings = DEFAULT_USER_SETTINGS;
 
 	if (userId) {
 		try {
 			const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-			nutritionGoals = await getNutritionGoals(supabaseUserId);
+			const [resolvedNutritionGoals, resolvedUserSettings] = await Promise.all([
+				getNutritionGoals(supabaseUserId),
+				getUserSettings(supabaseUserId),
+			]);
+			nutritionGoals = resolvedNutritionGoals;
+			userSettings = resolvedUserSettings;
 		} catch (err) {
-			console.error("Error fetching nutrition goals:", err);
+			console.error("Error fetching dashboard settings:", err);
 		}
 	}
 
@@ -44,7 +54,10 @@ export default async function SettingsPage() {
 					<CardTitle>Goals</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<SettingsForm defaultStepGoal={stepGoal} />
+					<SettingsForm
+						defaultStepGoal={stepGoal}
+						defaultSettings={userSettings}
+					/>
 				</CardContent>
 			</Card>
 

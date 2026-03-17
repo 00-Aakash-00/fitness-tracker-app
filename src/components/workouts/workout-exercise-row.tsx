@@ -22,13 +22,10 @@ import { ExerciseSetRow } from "./exercise-set-row";
 
 type WorkoutExerciseRowProps = {
 	workoutExercise: WorkoutExercise;
-	workoutId: string;
 };
 
 export function WorkoutExerciseRow({
 	workoutExercise,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: kept for prop interface consistency
-	workoutId,
 }: WorkoutExerciseRowProps) {
 	const [isExpanded, setIsExpanded] = useState(true);
 	const [historyOpen, setHistoryOpen] = useState(false);
@@ -171,7 +168,6 @@ export function WorkoutExerciseRow({
 						<ExerciseSetRow
 							key={set.id}
 							set={set}
-							workoutExerciseId={workoutExercise.id}
 							onUpdate={(setId, data) => {
 								setActionError(null);
 								clearSetError();

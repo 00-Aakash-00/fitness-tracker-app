@@ -111,7 +111,6 @@ export function WorkoutDayDetail({
 						<WorkoutCard
 							key={w.id}
 							workout={w}
-							exercises={exercises}
 							onAddExercise={(wId) => setAddExerciseWorkoutId(wId)}
 						/>
 					))}

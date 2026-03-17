@@ -1,5 +1,6 @@
 import "server-only";
 
+import { refreshUserAppState } from "@/lib/progress/progress.server";
 import { createAdminClient } from "@/lib/supabase";
 import {
 	fetchWhoopBasicProfile,
@@ -1208,6 +1209,7 @@ export async function processPendingWhoopSyncJobs(params?: {
 	const limit = Math.max(1, params?.limit ?? 10);
 	const workerId =
 		params?.workerId ?? `whoop-sync-${process.pid}-${Date.now().toString(36)}`;
+	const usersToRefresh = new Set<string>();
 
 	for (let index = 0; index < limit; index += 1) {
 		const job = await claimNextJob(workerId, {
@@ -1227,10 +1229,24 @@ export async function processPendingWhoopSyncJobs(params?: {
 			} else {
 				result.rescheduled += 1;
 			}
+			usersToRefresh.add(job.user_id);
 		} catch (error) {
 			result.failed += 1;
 			await failJob(job, error);
 		}
+	}
+
+	if (usersToRefresh.size > 0) {
+		await Promise.all(
+			Array.from(usersToRefresh, (userId) =>
+				refreshUserAppState({
+					supabaseUserId: userId,
+					days: 90,
+				}).catch((error) => {
+					console.error("Error refreshing WHOOP app state:", error);
+				})
+			)
+		);
 	}
 
 	return result;

@@ -206,7 +206,8 @@ export function AddMealSheet({
 								Describe your meal
 							</label>
 							<p className="text-xs text-secondary-text">
-								e.g. "2 eggs, toast with butter, and a glass of orange juice"
+								For example: 2 eggs, toast with butter, and a glass of orange
+								juice
 							</p>
 							<textarea
 								id="ai-input"

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { Meal, NutritionGoals } from "@/lib/nutrition/utils";
+import { refreshUserAppState } from "@/lib/progress/progress.server";
 import {
 	getAuthenticatedSupabaseContext,
 	getUserSupabaseClient,
@@ -11,6 +12,18 @@ const DEFAULT_GOALS: NutritionGoals = {
 	dailyCalories: 2000,
 	dailyProtein: 150,
 };
+
+async function refreshNutritionProgress(supabaseUserId: string) {
+	await refreshUserAppState({
+		supabaseUserId,
+		days: 90,
+	});
+	revalidatePath("/dashboard", "layout");
+	revalidatePath("/dashboard");
+	revalidatePath("/dashboard/progress");
+	revalidatePath("/dashboard/nutrition");
+	revalidatePath("/dashboard/settings");
+}
 
 export async function getNutritionGoals(
 	supabaseUserId: string
@@ -88,8 +101,7 @@ export async function updateNutritionGoals(
 		return { status: "error", message: "Failed to save goals." };
 	}
 
-	revalidatePath("/dashboard/nutrition");
-	revalidatePath("/dashboard/settings");
+	await refreshNutritionProgress(context.supabaseUserId);
 	return { status: "success", message: "Nutrition goals saved." };
 }
 
@@ -210,7 +222,7 @@ export async function addMeal(
 		return { status: "error", message: "Failed to add meal." };
 	}
 
-	revalidatePath("/dashboard/nutrition");
+	await refreshNutritionProgress(context.supabaseUserId);
 	return { status: "success", message: "Meal added." };
 }
 
@@ -280,7 +292,7 @@ export async function updateMeal(
 		return { status: "error", message: "Failed to update meal." };
 	}
 
-	revalidatePath("/dashboard/nutrition");
+	await refreshNutritionProgress(context.supabaseUserId);
 	return { status: "success", message: "Meal updated." };
 }
 
@@ -308,6 +320,6 @@ export async function deleteMeal(
 		return { status: "error", message: "Failed to delete meal." };
 	}
 
-	revalidatePath("/dashboard/nutrition");
+	await refreshNutritionProgress(context.supabaseUserId);
 	return { status: "success", message: "Meal deleted." };
 }

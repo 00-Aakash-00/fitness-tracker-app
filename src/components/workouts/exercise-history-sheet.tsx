@@ -37,18 +37,34 @@ export function ExerciseHistorySheet({
 	useEffect(() => {
 		if (!open) return;
 
-		setIsLoading(true);
-		fetch(`/api/exercise-history?exerciseId=${exerciseId}`)
-			.then((res) => res.json())
-			.then((data) => {
-				setHistory(data.history ?? []);
-			})
-			.catch(() => {
-				setHistory([]);
-			})
-			.finally(() => {
-				setIsLoading(false);
-			});
+		let cancelled = false;
+
+		const loadHistory = async () => {
+			setIsLoading(true);
+			try {
+				const response = await fetch(
+					`/api/exercise-history?exerciseId=${exerciseId}`
+				);
+				const data = await response.json();
+				if (!cancelled) {
+					setHistory(data.history ?? []);
+				}
+			} catch {
+				if (!cancelled) {
+					setHistory([]);
+				}
+			} finally {
+				if (!cancelled) {
+					setIsLoading(false);
+				}
+			}
+		};
+
+		void loadHistory();
+
+		return () => {
+			cancelled = true;
+		};
 	}, [open, exerciseId]);
 
 	return (

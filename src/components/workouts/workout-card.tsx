@@ -17,26 +17,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type {
-	Exercise,
-	WorkoutWithExercises,
-} from "@/lib/workouts/workouts.types";
+import type { WorkoutWithExercises } from "@/lib/workouts/workouts.types";
 import { getStatusColor, getStatusLabel } from "@/lib/workouts/workouts.utils";
 import { WorkoutExerciseRow } from "./workout-exercise-row";
 import { WorkoutStatsSummary } from "./workout-stats-summary";
 
 type WorkoutCardProps = {
 	workout: WorkoutWithExercises;
-	exercises: Exercise[];
 	onAddExercise: (workoutId: string) => void;
 };
 
-export function WorkoutCard({
-	workout,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: kept for prop interface consistency
-	exercises,
-	onAddExercise,
-}: WorkoutCardProps) {
+export function WorkoutCard({ workout, onAddExercise }: WorkoutCardProps) {
 	const [isExpanded, setIsExpanded] = useState(
 		workout.status === "in_progress"
 	);
@@ -145,9 +136,13 @@ export function WorkoutCard({
 				<CardContent className="space-y-2 px-3 pb-3 pt-0">
 					{workout.exercises.map((we) => (
 						<WorkoutExerciseRow
-							key={we.id}
+							key={`${we.id}:${we.isCompleted ? "1" : "0"}:${we.sets
+								.map(
+									(set) =>
+										`${set.id}-${set.weight ?? ""}-${set.reps ?? ""}-${set.rpe ?? ""}-${set.isCompleted ? "1" : "0"}`
+								)
+								.join("|")}`}
 							workoutExercise={we}
-							workoutId={workout.id}
 						/>
 					))}
 

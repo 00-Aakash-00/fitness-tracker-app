@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { refreshUserAppState } from "@/lib/progress/progress.server";
 import type { AppSupabaseClient } from "@/lib/supabase";
 import {
 	type AuthenticatedSupabaseContext,
@@ -46,6 +47,17 @@ function getNumber(formData: FormData, key: string): number | null {
 
 async function getAuthenticatedWorkoutContext(): Promise<AuthenticatedSupabaseContext | null> {
 	return getAuthenticatedSupabaseContext();
+}
+
+async function refreshWorkoutProgressViews(supabaseUserId: string) {
+	await refreshUserAppState({
+		supabaseUserId,
+		days: 90,
+	});
+	revalidatePath("/dashboard", "layout");
+	revalidatePath("/dashboard");
+	revalidatePath("/dashboard/progress");
+	revalidatePath("/dashboard/workouts");
 }
 
 function parseTemplateExercises(rawValue: string | null): {
@@ -610,7 +622,7 @@ export async function createWorkoutFromTemplate(
 		}
 	}
 
-	revalidatePath("/dashboard/workouts");
+	await refreshWorkoutProgressViews(context.supabaseUserId);
 	return { status: "success", message: "Workout created from template." };
 }
 
@@ -641,7 +653,7 @@ export async function createEmptyWorkout(
 		return { status: "error", message: "Failed to create workout." };
 	}
 
-	revalidatePath("/dashboard/workouts");
+	await refreshWorkoutProgressViews(context.supabaseUserId);
 	return { status: "success", message: "Workout created." };
 }
 
@@ -1013,7 +1025,7 @@ export async function updateWorkoutStatus(
 		};
 	}
 
-	revalidatePath("/dashboard/workouts");
+	await refreshWorkoutProgressViews(context.supabaseUserId);
 	return { status: "success", message: `Workout ${status}.` };
 }
 
@@ -1043,7 +1055,7 @@ export async function deleteWorkout(formData: FormData): Promise<ActionResult> {
 		};
 	}
 
-	revalidatePath("/dashboard/workouts");
+	await refreshWorkoutProgressViews(context.supabaseUserId);
 	return { status: "success", message: "Workout deleted." };
 }
 

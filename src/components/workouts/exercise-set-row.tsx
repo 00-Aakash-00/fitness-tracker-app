@@ -7,7 +7,6 @@ import type { ExerciseSet, SetType } from "@/lib/workouts/workouts.types";
 
 type ExerciseSetRowProps = {
 	set: ExerciseSet;
-	workoutExerciseId: string;
 	onUpdate: (setId: string, data: Partial<ExerciseSet>) => void;
 	onDelete: (setId: string) => void;
 };
@@ -28,8 +27,6 @@ const setTypeColors: Record<SetType, string> = {
 
 export function ExerciseSetRow({
 	set,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: kept for prop interface consistency
-	workoutExerciseId,
 	onUpdate,
 	onDelete,
 }: ExerciseSetRowProps) {

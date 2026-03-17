@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { AppLogo } from "@/components/layout/app-logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { NotificationFeedItem } from "@/lib/notifications.server";
+import type { TodayAtAGlance } from "@/lib/progress/progress.types";
 import { cn } from "@/lib/utils";
 import { CommandSearch } from "./command-search";
 import { NotificationPanel } from "./notification-panel";
-import { WhatsNewCarousel } from "./whats-new-carousel";
+import { TodayAtAGlancePopover } from "./today-at-a-glance-popover";
 
 function UserAvatar() {
 	const { user, isLoaded } = useUser();
@@ -61,7 +63,13 @@ function UserAvatar() {
 	);
 }
 
-export function TopNav() {
+export function TopNav({
+	todayAtAGlance,
+	notifications,
+}: {
+	todayAtAGlance: TodayAtAGlance | null;
+	notifications: NotificationFeedItem[];
+}) {
 	const [scrolled, setScrolled] = useState(false);
 
 	useEffect(() => {
@@ -84,7 +92,7 @@ export function TopNav() {
 				{/* Left section: Logo + What's New */}
 				<div className="flex items-center gap-4">
 					<AppLogo href="/dashboard" priority />
-					<WhatsNewCarousel />
+					<TodayAtAGlancePopover glance={todayAtAGlance} />
 				</div>
 
 				{/* Center section: Command Search */}
@@ -98,7 +106,10 @@ export function TopNav() {
 					<div className="md:hidden">
 						<CommandSearch />
 					</div>
-					<NotificationPanel />
+					<NotificationPanel
+						key={notifications.map((notification) => notification.id).join(":")}
+						initialNotifications={notifications}
+					/>
 					<UserAvatar />
 				</div>
 			</div>

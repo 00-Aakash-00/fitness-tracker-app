@@ -1,5 +1,6 @@
 import "server-only";
 
+import { refreshUserAppState } from "@/lib/progress/progress.server";
 import { createAdminClient } from "@/lib/supabase";
 import {
 	buildOuraWebhookUrl,
@@ -1650,6 +1651,7 @@ export async function processPendingOuraSyncJobs(params?: {
 	const limit = Math.max(1, params?.limit ?? 10);
 	const workerId =
 		params?.workerId ?? `oura-sync-${process.pid}-${Date.now().toString(36)}`;
+	const usersToRefresh = new Set<string>();
 
 	for (let index = 0; index < limit; index += 1) {
 		const job = await claimNextJob(workerId, {
@@ -1669,10 +1671,24 @@ export async function processPendingOuraSyncJobs(params?: {
 			} else {
 				result.rescheduled += 1;
 			}
+			usersToRefresh.add(job.user_id);
 		} catch (error) {
 			result.failed += 1;
 			await failJob(job, error);
 		}
+	}
+
+	if (usersToRefresh.size > 0) {
+		await Promise.all(
+			Array.from(usersToRefresh, (userId) =>
+				refreshUserAppState({
+					supabaseUserId: userId,
+					days: 90,
+				}).catch((error) => {
+					console.error("Error refreshing Oura app state:", error);
+				})
+			)
+		);
 	}
 
 	return result;

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isValidDateString } from "@/lib/date";
+import { refreshUserAppState } from "@/lib/progress/progress.server";
 import type { AppSupabaseClient } from "@/lib/supabase";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase-user.server";
 
@@ -46,6 +47,23 @@ async function deleteChallengeById(
 
 	if (error) {
 		console.error("Error cleaning up partial challenge:", error);
+	}
+}
+
+async function refreshGoalProgress(
+	supabaseUserId: string,
+	challengeId?: string
+) {
+	await refreshUserAppState({
+		supabaseUserId,
+		days: 90,
+	});
+	revalidatePath("/dashboard", "layout");
+	revalidatePath("/dashboard");
+	revalidatePath("/dashboard/progress");
+	revalidatePath("/dashboard/goals");
+	if (challengeId) {
+		revalidatePath(`/dashboard/goals/${challengeId}`);
 	}
 }
 
@@ -141,7 +159,7 @@ export async function createChallenge(
 		};
 	}
 
-	revalidatePath("/dashboard/goals");
+	await refreshGoalProgress(context.supabaseUserId, challenge.id);
 	return {
 		status: "success",
 		message: "Challenge created.",
@@ -233,8 +251,7 @@ export async function toggleTaskCompletion(
 		}
 	}
 
-	revalidatePath("/dashboard/goals");
-	revalidatePath(`/dashboard/goals/${challengeId}`);
+	await refreshGoalProgress(context.supabaseUserId, challengeId);
 	return { status: "success", message: "Completion updated." };
 }
 
@@ -288,8 +305,7 @@ export async function updateChallengeStatus(
 		return { status: "error", message: "Failed to update challenge." };
 	}
 
-	revalidatePath("/dashboard/goals");
-	revalidatePath(`/dashboard/goals/${challengeId}`);
+	await refreshGoalProgress(context.supabaseUserId, challengeId);
 	return { status: "success", message: "Challenge updated." };
 }
 
@@ -335,6 +351,6 @@ export async function deleteChallenge(
 		return { status: "error", message: "Failed to delete challenge." };
 	}
 
-	revalidatePath("/dashboard/goals");
+	await refreshGoalProgress(context.supabaseUserId, challengeId);
 	return { status: "success", message: "Challenge deleted." };
 }

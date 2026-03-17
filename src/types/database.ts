@@ -39,6 +39,267 @@ export interface Database {
 				};
 				Relationships: [];
 			};
+			user_settings: {
+				Row: {
+					id: string;
+					user_id: string;
+					timezone: string | null;
+					reminder_time: string;
+					weekly_summary_day:
+						| "monday"
+						| "tuesday"
+						| "wednesday"
+						| "thursday"
+						| "friday"
+						| "saturday"
+						| "sunday";
+					notify_recovery: boolean;
+					notify_goals: boolean;
+					notify_nutrition: boolean;
+					notify_summaries: boolean;
+					notify_devices: boolean;
+					created_at: string;
+					updated_at: string;
+				};
+				Insert: {
+					id?: string;
+					user_id: string;
+					timezone?: string | null;
+					reminder_time?: string;
+					weekly_summary_day?:
+						| "monday"
+						| "tuesday"
+						| "wednesday"
+						| "thursday"
+						| "friday"
+						| "saturday"
+						| "sunday";
+					notify_recovery?: boolean;
+					notify_goals?: boolean;
+					notify_nutrition?: boolean;
+					notify_summaries?: boolean;
+					notify_devices?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Update: {
+					id?: string;
+					user_id?: string;
+					timezone?: string | null;
+					reminder_time?: string;
+					weekly_summary_day?:
+						| "monday"
+						| "tuesday"
+						| "wednesday"
+						| "thursday"
+						| "friday"
+						| "saturday"
+						| "sunday";
+					notify_recovery?: boolean;
+					notify_goals?: boolean;
+					notify_nutrition?: boolean;
+					notify_summaries?: boolean;
+					notify_devices?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: "user_settings_user_id_fkey";
+						columns: ["user_id"];
+						isOneToOne: false;
+						referencedRelation: "users";
+						referencedColumns: ["id"];
+					},
+				];
+			};
+			daily_user_metrics: {
+				Row: {
+					id: string;
+					user_id: string;
+					metric_date: string;
+					timezone: string;
+					active_wearable_provider: "oura" | "whoop" | null;
+					sync_freshness:
+						| "not_connected"
+						| "syncing"
+						| "baseline_forming"
+						| "ready"
+						| "stale"
+						| "blocked";
+					sleep_hours: number | null;
+					sleep_score: number | null;
+					readiness_score: number | null;
+					steps: number | null;
+					active_calories: number | null;
+					workout_count: number;
+					workout_duration_minutes: number;
+					calories_logged: number;
+					protein_logged: number;
+					calorie_goal_met: boolean;
+					protein_goal_met: boolean;
+					challenge_tasks_completed: number;
+					challenge_tasks_target: number;
+					challenge_goal_met: boolean;
+					created_at: string;
+					updated_at: string;
+				};
+				Insert: {
+					id?: string;
+					user_id: string;
+					metric_date: string;
+					timezone?: string;
+					active_wearable_provider?: "oura" | "whoop" | null;
+					sync_freshness?:
+						| "not_connected"
+						| "syncing"
+						| "baseline_forming"
+						| "ready"
+						| "stale"
+						| "blocked";
+					sleep_hours?: number | null;
+					sleep_score?: number | null;
+					readiness_score?: number | null;
+					steps?: number | null;
+					active_calories?: number | null;
+					workout_count?: number;
+					workout_duration_minutes?: number;
+					calories_logged?: number;
+					protein_logged?: number;
+					calorie_goal_met?: boolean;
+					protein_goal_met?: boolean;
+					challenge_tasks_completed?: number;
+					challenge_tasks_target?: number;
+					challenge_goal_met?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Update: {
+					id?: string;
+					user_id?: string;
+					metric_date?: string;
+					timezone?: string;
+					active_wearable_provider?: "oura" | "whoop" | null;
+					sync_freshness?:
+						| "not_connected"
+						| "syncing"
+						| "baseline_forming"
+						| "ready"
+						| "stale"
+						| "blocked";
+					sleep_hours?: number | null;
+					sleep_score?: number | null;
+					readiness_score?: number | null;
+					steps?: number | null;
+					active_calories?: number | null;
+					workout_count?: number;
+					workout_duration_minutes?: number;
+					calories_logged?: number;
+					protein_logged?: number;
+					calorie_goal_met?: boolean;
+					protein_goal_met?: boolean;
+					challenge_tasks_completed?: number;
+					challenge_tasks_target?: number;
+					challenge_goal_met?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: "daily_user_metrics_user_id_fkey";
+						columns: ["user_id"];
+						isOneToOne: false;
+						referencedRelation: "users";
+						referencedColumns: ["id"];
+					},
+				];
+			};
+			user_notifications: {
+				Row: {
+					id: string;
+					user_id: string;
+					type:
+						| "sync_complete"
+						| "sync_stale"
+						| "baseline_ready"
+						| "goal_hit"
+						| "goal_missed_risk"
+						| "protein_gap"
+						| "workout_streak"
+						| "recovery_low"
+						| "weekly_summary";
+					title: string;
+					body: string;
+					cta_label: string | null;
+					cta_href: string | null;
+					dedupe_key: string | null;
+					is_read: boolean;
+					read_at: string | null;
+					expires_at: string | null;
+					metadata: Json;
+					created_at: string;
+					updated_at: string;
+				};
+				Insert: {
+					id?: string;
+					user_id: string;
+					type:
+						| "sync_complete"
+						| "sync_stale"
+						| "baseline_ready"
+						| "goal_hit"
+						| "goal_missed_risk"
+						| "protein_gap"
+						| "workout_streak"
+						| "recovery_low"
+						| "weekly_summary";
+					title: string;
+					body: string;
+					cta_label?: string | null;
+					cta_href?: string | null;
+					dedupe_key?: string | null;
+					is_read?: boolean;
+					read_at?: string | null;
+					expires_at?: string | null;
+					metadata?: Json;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Update: {
+					id?: string;
+					user_id?: string;
+					type?:
+						| "sync_complete"
+						| "sync_stale"
+						| "baseline_ready"
+						| "goal_hit"
+						| "goal_missed_risk"
+						| "protein_gap"
+						| "workout_streak"
+						| "recovery_low"
+						| "weekly_summary";
+					title?: string;
+					body?: string;
+					cta_label?: string | null;
+					cta_href?: string | null;
+					dedupe_key?: string | null;
+					is_read?: boolean;
+					read_at?: string | null;
+					expires_at?: string | null;
+					metadata?: Json;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: "user_notifications_user_id_fkey";
+						columns: ["user_id"];
+						isOneToOne: false;
+						referencedRelation: "users";
+						referencedColumns: ["id"];
+					},
+				];
+			};
 			nutrition_goals: {
 				Row: {
 					id: string;
