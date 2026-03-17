@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -201,12 +200,9 @@ export default async function DevicesPage({
 								</Button>
 							) : (
 								<Button asChild>
-									<Link
-										href="/api/integrations/whoop/authorize?returnTo=/dashboard/devices"
-										prefetch={false}
-									>
+									<a href="/api/integrations/whoop/authorize?returnTo=/dashboard/devices">
 										Connect
-									</Link>
+									</a>
 								</Button>
 							)}
 						</div>
@@ -298,12 +294,9 @@ export default async function DevicesPage({
 								</Button>
 							) : (
 								<Button asChild>
-									<Link
-										href="/api/integrations/oura/authorize?returnTo=/dashboard/devices"
-										prefetch={false}
-									>
+									<a href="/api/integrations/oura/authorize?returnTo=/dashboard/devices">
 										Connect
-									</Link>
+									</a>
 								</Button>
 							)}
 						</div>

@@ -2754,6 +2754,7 @@ function buildDevicePanel(params: {
 		actionLabel: `Connect ${deviceName}`,
 		actionHref: `/api/integrations/${params.provider}/authorize?returnTo=/dashboard`,
 		actionMethod: "get",
+		navigationKind: "document",
 		lastSyncedLabel: null,
 	};
 }
@@ -2806,6 +2807,7 @@ function buildHeroActions(params: {
 		href: "/dashboard/settings",
 		tone: "secondary",
 		icon: "arrow",
+		navigationKind: "app",
 	};
 
 	if (params.state === "conflict") {
@@ -2816,6 +2818,7 @@ function buildHeroActions(params: {
 				href: "/dashboard/devices",
 				tone: "primary",
 				icon: "shield",
+				navigationKind: "app",
 			},
 			secondaryAction,
 		];
@@ -2830,6 +2833,7 @@ function buildHeroActions(params: {
 				href: "/dashboard/devices",
 				tone: "primary",
 				icon: "watch",
+				navigationKind: "app",
 			},
 			secondaryAction,
 		];
@@ -2848,6 +2852,7 @@ function buildHeroActions(params: {
 				href: `/api/integrations/${singleAvailableProvider}/authorize?returnTo=/dashboard`,
 				tone: "primary",
 				icon: "watch",
+				navigationKind: "document",
 			},
 			secondaryAction,
 		];
@@ -2864,6 +2869,7 @@ function buildHeroActions(params: {
 			href: "/dashboard/devices",
 			tone: "primary",
 			icon: "watch",
+			navigationKind: "app",
 		},
 		secondaryAction,
 	];

@@ -43,12 +43,27 @@ export function TopIntro({
 							variant={action.tone === "primary" ? "default" : "outline"}
 							className="h-10 justify-between rounded-xl px-4"
 						>
-							<Link href={action.href}>
-								<span>{action.label}</span>
-								{action.icon ? (
-									<DashboardIconGlyph icon={action.icon} className="h-4 w-4" />
-								) : null}
-							</Link>
+							{action.navigationKind === "document" ? (
+								<a href={action.href}>
+									<span>{action.label}</span>
+									{action.icon ? (
+										<DashboardIconGlyph
+											icon={action.icon}
+											className="h-4 w-4"
+										/>
+									) : null}
+								</a>
+							) : (
+								<Link href={action.href}>
+									<span>{action.label}</span>
+									{action.icon ? (
+										<DashboardIconGlyph
+											icon={action.icon}
+											className="h-4 w-4"
+										/>
+									) : null}
+								</Link>
+							)}
 						</Button>
 					))}
 				</div>

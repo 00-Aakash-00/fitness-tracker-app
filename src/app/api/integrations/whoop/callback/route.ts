@@ -15,7 +15,9 @@ import {
 } from "@/lib/integrations/oauth-connections.server";
 import {
 	getWearableBrowserErrorMessage,
+	logWearableOAuthStateFailure,
 	logWearableRouteError,
+	withNoStoreHeader,
 } from "@/lib/integrations/wearable-route-errors.server";
 import {
 	buildWhoopCallbackUrl,
@@ -54,7 +56,7 @@ function redirectToDevices(params: {
 	url.searchParams.set("integration", "whoop");
 	url.searchParams.set("status", params.status);
 	if (params.message) url.searchParams.set("message", params.message);
-	return NextResponse.redirect(url, { status: 303 });
+	return withNoStoreHeader(NextResponse.redirect(url, { status: 303 }));
 }
 
 function clearWhoopStateCookie(response: NextResponse) {
@@ -76,6 +78,32 @@ function redirectToDevicesWithStateReset(params: {
 	const response = redirectToDevices(params);
 	clearWhoopStateCookie(response);
 	return response;
+}
+
+function logWhoopStateFailure(params: {
+	reason:
+		| "missing_cookie"
+		| "redirect_uri_mismatch"
+		| "expired_state"
+		| "state_mismatch";
+	cookiePayload: ReturnType<typeof decodeCookiePayload>;
+	expectedRedirectUri?: string;
+	state?: string | null;
+	userId?: string | null;
+}) {
+	logWearableOAuthStateFailure({
+		actualRedirectUri: params.cookiePayload?.redirectUri,
+		expectedRedirectUri: params.expectedRedirectUri,
+		hasCookiePayload: Boolean(params.cookiePayload),
+		hasStateParam: Boolean(params.state),
+		provider: "whoop",
+		reason: params.reason,
+		returnTo: params.cookiePayload?.returnTo,
+		stateAgeMs: params.cookiePayload
+			? Date.now() - params.cookiePayload.createdAt
+			: null,
+		userId: params.userId,
+	});
 }
 
 async function rollbackFailedWhoopConnection(params: {
@@ -148,7 +176,9 @@ export async function GET(request: NextRequest) {
 	const origin = getCanonicalAppOrigin(request);
 	const { userId } = await auth();
 	if (!userId) {
-		return NextResponse.redirect(new URL("/sign-in", request.url));
+		return withNoStoreHeader(
+			NextResponse.redirect(new URL("/sign-in", request.url))
+		);
 	}
 
 	const cookieName = OAUTH_STATE_COOKIE_NAME.whoop;
@@ -181,6 +211,13 @@ export async function GET(request: NextRequest) {
 		const state = request.nextUrl.searchParams.get("state");
 
 		if (!cookiePayload) {
+			logWhoopStateFailure({
+				reason: "missing_cookie",
+				cookiePayload,
+				expectedRedirectUri: buildWhoopCallbackUrl(origin),
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -191,6 +228,13 @@ export async function GET(request: NextRequest) {
 
 		const expectedRedirectUri = buildWhoopCallbackUrl(origin);
 		if (cookiePayload.redirectUri !== expectedRedirectUri) {
+			logWhoopStateFailure({
+				reason: "redirect_uri_mismatch",
+				cookiePayload,
+				expectedRedirectUri,
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -200,6 +244,13 @@ export async function GET(request: NextRequest) {
 		}
 
 		if (Date.now() - cookiePayload.createdAt > WHOOP_STATE_TTL_MS) {
+			logWhoopStateFailure({
+				reason: "expired_state",
+				cookiePayload,
+				expectedRedirectUri,
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -209,6 +260,13 @@ export async function GET(request: NextRequest) {
 		}
 
 		if (!state || state !== cookiePayload.state) {
+			logWhoopStateFailure({
+				reason: "state_mismatch",
+				cookiePayload,
+				expectedRedirectUri,
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,

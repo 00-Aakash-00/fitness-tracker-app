@@ -17,6 +17,7 @@ import {
 	getWearableBrowserErrorMessage,
 	getWearableConfigMessage,
 	logWearableRouteError,
+	withNoStoreHeader,
 } from "@/lib/integrations/wearable-route-errors.server";
 import {
 	buildWhoopAuthorizeUrl,
@@ -35,13 +36,15 @@ function redirectToDevices(params: {
 	url.searchParams.set("integration", "whoop");
 	url.searchParams.set("status", params.status);
 	url.searchParams.set("message", params.message);
-	return NextResponse.redirect(url, { status: 303 });
+	return withNoStoreHeader(NextResponse.redirect(url, { status: 303 }));
 }
 
 export async function GET(request: NextRequest) {
 	const { userId } = await auth();
 	if (!userId) {
-		return NextResponse.redirect(new URL("/sign-in", request.url));
+		return withNoStoreHeader(
+			NextResponse.redirect(new URL("/sign-in", request.url))
+		);
 	}
 
 	const origin = getCanonicalAppOrigin(request);
@@ -90,7 +93,7 @@ export async function GET(request: NextRequest) {
 		const scope = getWhoopScopes();
 		const authorizeUrl = buildWhoopAuthorizeUrl({ redirectUri, state, scope });
 
-		const response = NextResponse.redirect(authorizeUrl);
+		const response = withNoStoreHeader(NextResponse.redirect(authorizeUrl));
 
 		const payload: OAuthStateCookiePayload = {
 			state,

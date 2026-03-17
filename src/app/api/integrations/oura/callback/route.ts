@@ -33,7 +33,9 @@ import {
 } from "@/lib/integrations/oura-sync.server";
 import {
 	getWearableBrowserErrorMessage,
+	logWearableOAuthStateFailure,
 	logWearableRouteError,
+	withNoStoreHeader,
 } from "@/lib/integrations/wearable-route-errors.server";
 
 export const runtime = "nodejs";
@@ -51,7 +53,7 @@ function redirectToDevices(params: {
 	url.searchParams.set("integration", "oura");
 	url.searchParams.set("status", params.status);
 	if (params.message) url.searchParams.set("message", params.message);
-	return NextResponse.redirect(url, { status: 303 });
+	return withNoStoreHeader(NextResponse.redirect(url, { status: 303 }));
 }
 
 function clearOuraStateCookie(response: NextResponse) {
@@ -73,6 +75,32 @@ function redirectToDevicesWithStateReset(params: {
 	const response = redirectToDevices(params);
 	clearOuraStateCookie(response);
 	return response;
+}
+
+function logOuraStateFailure(params: {
+	reason:
+		| "missing_cookie"
+		| "redirect_uri_mismatch"
+		| "expired_state"
+		| "state_mismatch";
+	cookiePayload: ReturnType<typeof decodeCookiePayload>;
+	expectedRedirectUri?: string;
+	state?: string | null;
+	userId?: string | null;
+}) {
+	logWearableOAuthStateFailure({
+		actualRedirectUri: params.cookiePayload?.redirectUri,
+		expectedRedirectUri: params.expectedRedirectUri,
+		hasCookiePayload: Boolean(params.cookiePayload),
+		hasStateParam: Boolean(params.state),
+		provider: "oura",
+		reason: params.reason,
+		returnTo: params.cookiePayload?.returnTo,
+		stateAgeMs: params.cookiePayload
+			? Date.now() - params.cookiePayload.createdAt
+			: null,
+		userId: params.userId,
+	});
 }
 
 async function rollbackFailedOuraConnection(params: {
@@ -145,7 +173,9 @@ export async function GET(request: NextRequest) {
 	const origin = getCanonicalAppOrigin(request);
 	const { userId } = await auth();
 	if (!userId) {
-		return NextResponse.redirect(new URL("/sign-in", origin));
+		return withNoStoreHeader(
+			NextResponse.redirect(new URL("/sign-in", origin))
+		);
 	}
 
 	const cookieName = OAUTH_STATE_COOKIE_NAME.oura;
@@ -178,6 +208,13 @@ export async function GET(request: NextRequest) {
 		const state = request.nextUrl.searchParams.get("state");
 
 		if (!cookiePayload) {
+			logOuraStateFailure({
+				reason: "missing_cookie",
+				cookiePayload,
+				expectedRedirectUri: buildOuraCallbackUrl(origin),
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -188,6 +225,13 @@ export async function GET(request: NextRequest) {
 
 		const expectedRedirectUri = buildOuraCallbackUrl(origin);
 		if (cookiePayload.redirectUri !== expectedRedirectUri) {
+			logOuraStateFailure({
+				reason: "redirect_uri_mismatch",
+				cookiePayload,
+				expectedRedirectUri,
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -197,6 +241,13 @@ export async function GET(request: NextRequest) {
 		}
 
 		if (Date.now() - cookiePayload.createdAt > OURA_STATE_TTL_MS) {
+			logOuraStateFailure({
+				reason: "expired_state",
+				cookiePayload,
+				expectedRedirectUri,
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,
@@ -206,6 +257,13 @@ export async function GET(request: NextRequest) {
 		}
 
 		if (!state || state !== cookiePayload.state) {
+			logOuraStateFailure({
+				reason: "state_mismatch",
+				cookiePayload,
+				expectedRedirectUri,
+				state,
+				userId,
+			});
 			return redirectToDevicesWithStateReset({
 				origin,
 				returnTo,

@@ -43,6 +43,7 @@ export interface DashboardActionLink {
 	href: string;
 	tone: "primary" | "secondary";
 	icon?: DashboardIcon;
+	navigationKind?: "app" | "document";
 }
 
 export interface DashboardJourneyStep {
@@ -111,6 +112,7 @@ export interface ConnectionDevicePanelState {
 	actionLabel: string;
 	actionHref?: string;
 	actionMethod?: "get" | "post";
+	navigationKind?: "app" | "document";
 	lastSyncedLabel?: string | null;
 }
 

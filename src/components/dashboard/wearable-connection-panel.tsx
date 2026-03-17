@@ -154,7 +154,11 @@ function DeviceAction({ device }: { device: ConnectionDevicePanelState }) {
 			variant={device.featured ? "default" : "outline"}
 			className="min-h-9 rounded-lg"
 		>
-			<Link href={device.actionHref}>{device.actionLabel}</Link>
+			{device.navigationKind === "document" ? (
+				<a href={device.actionHref}>{device.actionLabel}</a>
+			) : (
+				<Link href={device.actionHref}>{device.actionLabel}</Link>
+			)}
 		</Button>
 	);
 }
