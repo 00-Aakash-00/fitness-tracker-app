@@ -1,4 +1,4 @@
-import { groq } from "@ai-sdk/groq";
+import { createGroq } from "@ai-sdk/groq";
 import { auth } from "@clerk/nextjs/server";
 import { generateText, Output } from "ai";
 import { z } from "zod";
@@ -9,7 +9,7 @@ const mealSchema = z.object({
 	protein: z.number().int().min(0).describe("Estimated protein in grams"),
 });
 
-const MEAL_ANALYSIS_MODEL = "openai/gpt-oss-20b";
+const MEAL_ANALYSIS_MODEL = "moonshotai/kimi-k2-instruct-0905";
 
 export async function POST(request: Request) {
 	const { userId } = await auth();
@@ -29,12 +29,15 @@ export async function POST(request: Request) {
 		return Response.json({ error: "Input required" }, { status: 400 });
 	}
 
-	if (!process.env.GROQ_API_KEY?.trim()) {
+	const groqApiKey = process.env.GROQ_API_KEY?.trim();
+	if (!groqApiKey) {
 		return Response.json(
 			{ error: "AI meal analysis is not configured." },
 			{ status: 500 }
 		);
 	}
+
+	const groq = createGroq({ apiKey: groqApiKey });
 
 	try {
 		const { output } = await generateText({
@@ -52,7 +55,10 @@ export async function POST(request: Request) {
 
 		return Response.json(output);
 	} catch (error) {
-		console.error("AI meal analysis error:", error);
+		console.error("AI meal analysis error:", {
+			model: MEAL_ANALYSIS_MODEL,
+			error,
+		});
 		return Response.json(
 			{ error: "Failed to analyze meal. Please try again." },
 			{ status: 500 }
