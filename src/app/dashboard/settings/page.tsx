@@ -1,7 +1,11 @@
+import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { getNutritionGoals } from "@/app/dashboard/nutrition/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getSupabaseUserIdByClerkId } from "@/lib/integrations/oauth-connections.server";
 import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
+import { NutritionGoalsForm } from "./nutrition-goals-form";
 import { SettingsForm } from "./settings-form";
 
 export const metadata: Metadata = {
@@ -11,6 +15,18 @@ export const metadata: Metadata = {
 export default async function SettingsPage() {
 	const cookieStore = await cookies();
 	const stepGoal = parseStepGoal(cookieStore.get(STEP_GOAL_COOKIE)?.value);
+
+	const { userId } = await auth();
+	let nutritionGoals = { dailyCalories: 2000, dailyProtein: 150 };
+
+	if (userId) {
+		try {
+			const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
+			nutritionGoals = await getNutritionGoals(supabaseUserId);
+		} catch (err) {
+			console.error("Error fetching nutrition goals:", err);
+		}
+	}
 
 	return (
 		<div className="space-y-6">
@@ -29,6 +45,18 @@ export default async function SettingsPage() {
 				</CardHeader>
 				<CardContent>
 					<SettingsForm defaultStepGoal={stepGoal} />
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>Nutrition Goals</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<NutritionGoalsForm
+						defaultCalories={nutritionGoals.dailyCalories}
+						defaultProtein={nutritionGoals.dailyProtein}
+					/>
 				</CardContent>
 			</Card>
 		</div>

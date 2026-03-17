@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { updateNutritionGoals } from "@/app/dashboard/nutrition/actions";
 import { DEFAULT_STEP_GOAL, STEP_GOAL_COOKIE } from "@/lib/preferences";
 
 export type SettingsActionState =
@@ -49,4 +50,17 @@ export async function updateSettings(
 		message,
 		stepGoal: parsedStepGoal,
 	};
+}
+
+export type NutritionGoalsActionState =
+	| { status: "idle" }
+	| { status: "success"; message: string }
+	| { status: "error"; message: string };
+
+export async function updateNutritionGoalsAction(
+	_prevState: NutritionGoalsActionState,
+	formData: FormData
+): Promise<NutritionGoalsActionState> {
+	const result = await updateNutritionGoals(formData);
+	return result;
 }

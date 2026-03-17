@@ -998,6 +998,441 @@ Queue table for WHOOP data sync jobs (refresh, backfill, reconcile, webhook fetc
 
 ---
 
+### `public.nutrition_goals`
+
+Daily calorie/protein goals per user.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` |
+| `daily_calories` | `integer` | NO | `2000` | Daily calorie target |
+| `daily_protein` | `integer` | NO | `150` | Daily protein target (grams) |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Unique Constraints:** `(user_id)` — one goal row per user
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `nutrition_goals_pkey` | UNIQUE | `id` |
+| `idx_nutrition_goals_user_id` | BTREE | `user_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own nutrition_goals` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.meals`
+
+Individual meal entries logged by users.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` |
+| `meal_date` | `date` | NO | - | Date of the meal |
+| `name` | `text` | NO | - | Meal name/description |
+| `calories` | `integer` | NO | - | Calorie count |
+| `protein` | `integer` | NO | - | Protein in grams |
+| `source` | `text` | NO | `'manual'` | Entry source (`ai` or `manual`) |
+| `raw_input` | `text` | YES | - | Original text input (for AI-parsed meals) |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Check Constraints:**
+- `source IN ('ai', 'manual')`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `meals_pkey` | UNIQUE | `id` |
+| `idx_meals_user_date` | BTREE | `user_id, meal_date` |
+| `idx_meals_user_date_range` | BTREE | `user_id, meal_date DESC` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own meals` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.challenges`
+
+User-defined challenges/goals with duration and status tracking.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` |
+| `name` | `text` | NO | - | Challenge name |
+| `description` | `text` | YES | `''` | Challenge description |
+| `duration` | `integer` | NO | - | Duration in days (1–365) |
+| `start_date` | `date` | NO | - | Challenge start date |
+| `timezone` | `text` | NO | `'UTC'` | User's timezone |
+| `status` | `text` | NO | `'active'` | Challenge status |
+| `template_id` | `text` | YES | - | Optional template identifier |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Check Constraints:**
+- `duration >= 1 AND duration <= 365`
+- `status IN ('active', 'paused', 'completed', 'abandoned')`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `challenges_pkey` | UNIQUE | `id` |
+| `idx_challenges_user_id` | BTREE | `user_id` |
+| `idx_challenges_user_status` | BTREE | `user_id, status` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own challenges` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.challenge_tasks`
+
+Individual tasks within a challenge.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `challenge_id` | `uuid` | NO | - | FK to `public.challenges.id` |
+| `label` | `text` | NO | - | Task label |
+| `sort_order` | `integer` | NO | `0` | Display order |
+| `created_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Foreign Keys:**
+- `challenge_id` -> `public.challenges.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `challenge_tasks_pkey` | UNIQUE | `id` |
+| `idx_challenge_tasks_challenge_id` | BTREE | `challenge_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own challenge_tasks` | PERMISSIVE | ALL | `challenge_id IN (SELECT id FROM challenges WHERE user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub')))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.daily_completions`
+
+Tracks daily task completions within a challenge.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `challenge_id` | `uuid` | NO | - | FK to `public.challenges.id` |
+| `task_id` | `uuid` | NO | - | FK to `public.challenge_tasks.id` |
+| `completed_date` | `date` | NO | - | Date of completion |
+| `completed_at` | `timestamptz` | NO | `now()` | Completion timestamp |
+
+**Primary Key:** `id`
+
+**Unique Constraints:** `(task_id, completed_date)` — one completion per task per day
+
+**Foreign Keys:**
+- `challenge_id` -> `public.challenges.id` (ON DELETE CASCADE)
+- `task_id` -> `public.challenge_tasks.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `daily_completions_pkey` | UNIQUE | `id` |
+| `idx_daily_completions_challenge_date` | BTREE | `challenge_id, completed_date` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own daily_completions` | PERMISSIVE | ALL | `challenge_id IN (SELECT id FROM challenges WHERE user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub')))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.exercises`
+
+Exercise catalog containing system-defined (user_id IS NULL) and user-created exercises.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | YES | - | FK to `public.users.id` (NULL = system exercise) |
+| `name` | `text` | NO | - | Exercise name |
+| `muscle_group` | `text` | YES | - | Target muscle group |
+| `equipment` | `text` | YES | - | Required equipment |
+| `created_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `exercises_pkey` | UNIQUE | `id` |
+| `idx_exercises_user_id` | BTREE | `user_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users read system and own exercises` | PERMISSIVE | SELECT | `user_id IS NULL OR user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+| `Users manage own exercises` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+
+**Seed Data:** 48 system exercises across Chest, Back, Shoulders, Legs, Arms, and Core muscle groups.
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.workout_templates`
+
+Reusable workout templates created by users.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` |
+| `name` | `text` | NO | - | Template name |
+| `description` | `text` | YES | - | Template description |
+| `color` | `text` | YES | `'#1d83ab'` | Display color |
+| `sort_order` | `int` | NO | `0` | Display order |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `workout_templates_pkey` | UNIQUE | `id` |
+| `idx_workout_templates_user` | BTREE | `user_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own workout_templates` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.template_exercises`
+
+Exercises within a workout template.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `template_id` | `uuid` | NO | - | FK to `public.workout_templates.id` |
+| `exercise_id` | `uuid` | NO | - | FK to `public.exercises.id` |
+| `sort_order` | `int` | NO | `0` | Display order |
+| `target_sets` | `int` | YES | - | Target number of sets |
+| `target_reps` | `text` | YES | - | Target reps (e.g. "8-12") |
+| `target_weight` | `numeric(7,2)` | YES | - | Target weight |
+| `notes` | `text` | YES | - | Exercise notes |
+| `rest_seconds` | `int` | YES | - | Rest time between sets |
+| `created_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Foreign Keys:**
+- `template_id` -> `public.workout_templates.id` (ON DELETE CASCADE)
+- `exercise_id` -> `public.exercises.id` (ON DELETE RESTRICT)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `template_exercises_pkey` | UNIQUE | `id` |
+| `idx_template_exercises_template` | BTREE | `template_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own template_exercises` | PERMISSIVE | ALL | `template_id IN (SELECT id FROM workout_templates WHERE user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub')))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.workouts`
+
+Daily workout instances (can be created from a template or standalone).
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | NO | - | FK to `public.users.id` |
+| `template_id` | `uuid` | YES | - | FK to `public.workout_templates.id` (optional) |
+| `name` | `text` | NO | - | Workout name |
+| `date` | `date` | NO | - | Workout date |
+| `status` | `text` | NO | `'planned'` | Workout status |
+| `started_at` | `timestamptz` | YES | - | When workout was started |
+| `completed_at` | `timestamptz` | YES | - | When workout was completed |
+| `notes` | `text` | YES | - | Workout notes |
+| `duration_minutes` | `int` | YES | - | Total duration in minutes |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Check Constraints:**
+- `status IN ('planned', 'in_progress', 'completed', 'skipped')`
+
+**Foreign Keys:**
+- `user_id` -> `public.users.id` (ON DELETE CASCADE)
+- `template_id` -> `public.workout_templates.id` (ON DELETE SET NULL)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `workouts_pkey` | UNIQUE | `id` |
+| `idx_workouts_user_date` | BTREE | `user_id, date` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own workouts` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.workout_exercises`
+
+Exercises within a workout instance.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `workout_id` | `uuid` | NO | - | FK to `public.workouts.id` |
+| `exercise_id` | `uuid` | NO | - | FK to `public.exercises.id` |
+| `sort_order` | `int` | NO | `0` | Display order |
+| `is_completed` | `boolean` | NO | `false` | Whether exercise is completed |
+| `notes` | `text` | YES | - | Exercise notes |
+| `created_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Foreign Keys:**
+- `workout_id` -> `public.workouts.id` (ON DELETE CASCADE)
+- `exercise_id` -> `public.exercises.id` (ON DELETE RESTRICT)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `workout_exercises_pkey` | UNIQUE | `id` |
+| `idx_workout_exercises_workout` | BTREE | `workout_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own workout_exercises` | PERMISSIVE | ALL | `workout_id IN (SELECT id FROM workouts WHERE user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub')))` |
+
+**RLS Enabled:** Yes
+
+---
+
+### `public.exercise_sets`
+
+Individual sets per exercise within a workout.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | Primary key |
+| `workout_exercise_id` | `uuid` | NO | - | FK to `public.workout_exercises.id` |
+| `set_number` | `int` | NO | - | Set number within the exercise |
+| `set_type` | `text` | NO | `'working'` | Set type |
+| `weight` | `numeric(7,2)` | YES | - | Weight used |
+| `reps` | `int` | YES | - | Number of reps |
+| `rpe` | `numeric(3,1)` | YES | - | Rate of perceived exertion |
+| `is_completed` | `boolean` | NO | `false` | Whether set is completed |
+| `notes` | `text` | YES | - | Set notes |
+| `created_at` | `timestamptz` | NO | `now()` | |
+
+**Primary Key:** `id`
+
+**Check Constraints:**
+- `set_type IN ('warmup', 'working', 'dropset', 'failure')`
+
+**Foreign Keys:**
+- `workout_exercise_id` -> `public.workout_exercises.id` (ON DELETE CASCADE)
+
+**Indexes:**
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `exercise_sets_pkey` | UNIQUE | `id` |
+| `idx_exercise_sets_workout_exercise` | BTREE | `workout_exercise_id` |
+
+**RLS Policies:**
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own exercise_sets` | PERMISSIVE | ALL | `workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))))` |
+
+**RLS Enabled:** Yes
+
+---
+
 ## Enums
 
 ### `oura_data_type`
@@ -1186,6 +1621,86 @@ Each Oura data table has:
 | `whoop_sync_jobs_user_fingerprint_key` | UNIQUE | `user_id, fingerprint` |
 | `whoop_sync_jobs_pending_idx` | BTREE | `status, available_at, priority DESC, created_at` |
 
+### `public.nutrition_goals`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `nutrition_goals_pkey` | UNIQUE | `id` |
+| `idx_nutrition_goals_user_id` | BTREE | `user_id` |
+
+### `public.meals`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `meals_pkey` | UNIQUE | `id` |
+| `idx_meals_user_date` | BTREE | `user_id, meal_date` |
+| `idx_meals_user_date_range` | BTREE | `user_id, meal_date DESC` |
+
+### `public.challenges`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `challenges_pkey` | UNIQUE | `id` |
+| `idx_challenges_user_id` | BTREE | `user_id` |
+| `idx_challenges_user_status` | BTREE | `user_id, status` |
+
+### `public.challenge_tasks`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `challenge_tasks_pkey` | UNIQUE | `id` |
+| `idx_challenge_tasks_challenge_id` | BTREE | `challenge_id` |
+
+### `public.daily_completions`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `daily_completions_pkey` | UNIQUE | `id` |
+| `daily_completions_task_id_completed_date_key` | UNIQUE | `task_id, completed_date` |
+| `idx_daily_completions_challenge_date` | BTREE | `challenge_id, completed_date` |
+
+### `public.exercises`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `exercises_pkey` | UNIQUE | `id` |
+| `idx_exercises_user_id` | BTREE | `user_id` |
+
+### `public.workout_templates`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `workout_templates_pkey` | UNIQUE | `id` |
+| `idx_workout_templates_user` | BTREE | `user_id` |
+
+### `public.template_exercises`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `template_exercises_pkey` | UNIQUE | `id` |
+| `idx_template_exercises_template` | BTREE | `template_id` |
+
+### `public.workouts`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `workouts_pkey` | UNIQUE | `id` |
+| `idx_workouts_user_date` | BTREE | `user_id, date` |
+
+### `public.workout_exercises`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `workout_exercises_pkey` | UNIQUE | `id` |
+| `idx_workout_exercises_workout` | BTREE | `workout_id` |
+
+### `public.exercise_sets`
+
+| Index Name | Type | Columns |
+|------------|------|---------|
+| `exercise_sets_pkey` | UNIQUE | `id` |
+| `idx_exercise_sets_workout_exercise` | BTREE | `workout_exercise_id` |
+
 ---
 
 ## Row Level Security (RLS) Policies
@@ -1214,6 +1729,18 @@ Each Whoop data table (`whoop_profile`, `whoop_body_measurement`, `whoop_cycles`
 | Policy Name | Permission | Roles | Command | Condition |
 |-------------|------------|-------|---------|-----------|
 | `{table_name}_select_own` | PERMISSIVE | `authenticated` | SELECT | `EXISTS (SELECT 1 FROM public.users u WHERE u.id = {table}.user_id AND u.clerk_id = (auth.jwt() ->> 'sub'))` |
+
+### Nutrition, Challenges & Workout tables (11 tables)
+
+`nutrition_goals`, `meals`, `challenges`, `workout_templates`, `workouts` use a direct user_id ownership check:
+
+| Policy Name | Permission | Command | Condition |
+|-------------|------------|---------|-----------|
+| `Users manage own {table}` | PERMISSIVE | ALL | `user_id IN (SELECT id FROM users WHERE clerk_id = (auth.jwt()->>'sub'))` |
+
+`challenge_tasks`, `daily_completions`, `template_exercises`, `workout_exercises`, `exercise_sets` use cascading ownership checks through their parent tables.
+
+`exercises` has two policies: a SELECT policy allowing system exercises (`user_id IS NULL`) plus user-owned, and an ALL policy for user-owned exercises only.
 
 ### Server-only tables
 
@@ -1246,7 +1773,7 @@ $$;
 
 All tables with an `updated_at` column have a `BEFORE UPDATE` trigger that calls `update_updated_at_column()`:
 
-`users`, `oauth_connections`, `whoop_profile`, `whoop_body_measurement`, `whoop_cycles`, `whoop_sleeps`, `whoop_recoveries`, `whoop_workouts`, `whoop_sync_jobs`, `oura_personal_info`, `oura_tags`, `oura_enhanced_tags`, `oura_workouts`, `oura_sessions`, `oura_daily_activity`, `oura_daily_sleep`, `oura_daily_spo2`, `oura_daily_readiness`, `oura_sleep`, `oura_sleep_time`, `oura_rest_mode_periods`, `oura_ring_configurations`, `oura_daily_stress`, `oura_daily_resilience`, `oura_daily_cardiovascular_age`, `oura_vo2_max`, `oura_heart_rate`, `oura_webhook_subscriptions`, `oura_sync_jobs`
+`users`, `oauth_connections`, `whoop_profile`, `whoop_body_measurement`, `whoop_cycles`, `whoop_sleeps`, `whoop_recoveries`, `whoop_workouts`, `whoop_sync_jobs`, `oura_personal_info`, `oura_tags`, `oura_enhanced_tags`, `oura_workouts`, `oura_sessions`, `oura_daily_activity`, `oura_daily_sleep`, `oura_daily_spo2`, `oura_daily_readiness`, `oura_sleep`, `oura_sleep_time`, `oura_rest_mode_periods`, `oura_ring_configurations`, `oura_daily_stress`, `oura_daily_resilience`, `oura_daily_cardiovascular_age`, `oura_vo2_max`, `oura_heart_rate`, `oura_webhook_subscriptions`, `oura_sync_jobs`, `nutrition_goals`, `meals`, `challenges`, `workout_templates`, `workouts`
 
 Trigger name pattern: `update_{table_name}_updated_at`
 
@@ -1265,6 +1792,7 @@ Trigger name pattern: `update_{table_name}_updated_at`
 | `20260310214946` | `create_core_and_oura_user_tables` | Creates all Oura data tables and oauth_connections |
 | `20260310215004` | `create_oura_sync_tables` | Creates enums, webhook subscriptions/events, sync jobs |
 | `20260310215101` | `create_oura_indexes_policies_and_triggers` | Creates indexes, RLS policies, and update triggers |
+| `20260317000000` | `all_features_nutrition_goals_challenges_workouts` | Creates nutrition, challenges, workouts tables with RLS, indexes, and seed exercises |
 
 ---
 
