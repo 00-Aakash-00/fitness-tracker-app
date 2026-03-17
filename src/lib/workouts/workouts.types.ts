@@ -15,7 +15,7 @@ export type WorkoutTemplate = {
 	userId: string;
 	name: string;
 	description: string | null;
-	color: string;
+	color: string | null;
 	sortOrder: number;
 };
 

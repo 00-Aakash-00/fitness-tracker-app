@@ -52,7 +52,7 @@ export function TemplateList({
 								"disabled:opacity-50"
 							)}
 							style={{
-								borderLeftColor: t.color,
+								borderLeftColor: t.color ?? undefined,
 								borderLeftWidth: 3,
 							}}
 						>

@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createAdminClient } from "@/lib/supabase";
+import { getUserSupabaseClient } from "@/lib/supabase-user.server";
+import type { Tables } from "@/types/database";
 import type {
 	Exercise,
 	ExerciseSet,
@@ -13,33 +14,33 @@ import type {
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-function mapExerciseRow(row: Record<string, unknown>): Exercise {
+function mapExerciseRow(row: Tables<"exercises">): Exercise {
 	return {
-		id: row.id as string,
-		userId: (row.user_id as string) ?? null,
-		name: row.name as string,
-		muscleGroup: (row.muscle_group as string) ?? null,
-		equipment: (row.equipment as string) ?? null,
+		id: row.id,
+		userId: row.user_id,
+		name: row.name,
+		muscleGroup: row.muscle_group,
+		equipment: row.equipment,
 	};
 }
 
-function mapSetRow(row: Record<string, unknown>): ExerciseSet {
+function mapSetRow(row: Tables<"exercise_sets">): ExerciseSet {
 	return {
-		id: row.id as string,
-		workoutExerciseId: row.workout_exercise_id as string,
-		setNumber: row.set_number as number,
-		setType: row.set_type as ExerciseSet["setType"],
+		id: row.id,
+		workoutExerciseId: row.workout_exercise_id,
+		setNumber: row.set_number,
+		setType: row.set_type,
 		weight: row.weight !== null ? Number(row.weight) : null,
-		reps: (row.reps as number) ?? null,
+		reps: row.reps ?? null,
 		rpe: row.rpe !== null ? Number(row.rpe) : null,
-		isCompleted: (row.is_completed as boolean) ?? false,
-		notes: (row.notes as string) ?? null,
+		isCompleted: row.is_completed ?? false,
+		notes: row.notes ?? null,
 	};
 }
 
 function mapWorkoutExerciseRow(row: Record<string, unknown>): WorkoutExercise {
-	const exerciseData = row.exercises as Record<string, unknown>;
-	const setsData = (row.exercise_sets as Record<string, unknown>[]) ?? [];
+	const exerciseData = row.exercises as Tables<"exercises">;
+	const setsData = (row.exercise_sets as Tables<"exercise_sets">[]) ?? [];
 
 	return {
 		id: row.id as string,
@@ -53,19 +54,19 @@ function mapWorkoutExerciseRow(row: Record<string, unknown>): WorkoutExercise {
 	};
 }
 
-function mapWorkoutRow(row: Record<string, unknown>): Workout {
+function mapWorkoutRow(row: Tables<"workouts">): Workout {
 	return {
-		id: row.id as string,
-		userId: row.user_id as string,
-		templateId: (row.template_id as string) ?? null,
-		name: row.name as string,
-		date: row.date as string,
-		status: row.status as Workout["status"],
-		startedAt: (row.started_at as string) ?? null,
-		completedAt: (row.completed_at as string) ?? null,
-		notes: (row.notes as string) ?? null,
-		durationMinutes: (row.duration_minutes as number) ?? null,
-		color: (row.color as string) ?? null,
+		id: row.id,
+		userId: row.user_id,
+		templateId: row.template_id,
+		name: row.name,
+		date: row.date,
+		status: row.status,
+		startedAt: row.started_at,
+		completedAt: row.completed_at,
+		notes: row.notes,
+		durationMinutes: row.duration_minutes,
+		color: null,
 	};
 }
 
@@ -74,10 +75,13 @@ function mapWorkoutRow(row: Record<string, unknown>): Workout {
 export async function getExercises(
 	supabaseUserId: string
 ): Promise<Exercise[]> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 	const { data, error } = await supabase
 		.from("exercises")
-		.select("id, user_id, name, muscle_group, equipment")
+		.select("id, user_id, name, muscle_group, equipment, created_at")
 		.or(`user_id.is.null,user_id.eq.${supabaseUserId}`)
 		.order("name");
 
@@ -86,9 +90,7 @@ export async function getExercises(
 		return [];
 	}
 
-	return (data ?? [])
-		.map((row) => row as unknown as Record<string, unknown>)
-		.map(mapExerciseRow);
+	return (data ?? []).map(mapExerciseRow);
 }
 
 // ─── Templates ──────────────────────────────────────────────────
@@ -96,7 +98,10 @@ export async function getExercises(
 export async function getUserTemplates(
 	supabaseUserId: string
 ): Promise<TemplateWithExercises[]> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const { data, error } = await supabase
 		.from("workout_templates")
@@ -121,7 +126,7 @@ export async function getUserTemplates(
 		const templateExercises = (
 			(row.template_exercises as unknown as Record<string, unknown>[]) ?? []
 		).map((te) => {
-			const exerciseData = te.exercises as Record<string, unknown>;
+			const exerciseData = te.exercises as Tables<"exercises">;
 			return {
 				id: te.id as string,
 				templateId: te.template_id as string,
@@ -147,7 +152,7 @@ export async function getUserTemplates(
 			color: row.color,
 			sortOrder: row.sort_order,
 			exercises: templateExercises,
-		} as TemplateWithExercises;
+		};
 	});
 }
 
@@ -158,7 +163,10 @@ export async function getWorkoutsForMonth(
 	year: number,
 	month: number
 ): Promise<Workout[]> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
 	const lastDay = new Date(year, month, 0).getDate();
@@ -189,7 +197,7 @@ export async function getWorkoutsForMonth(
 			unknown
 		> | null;
 		return {
-			...mapWorkoutRow(row as unknown as Record<string, unknown>),
+			...mapWorkoutRow(row as Tables<"workouts">),
 			color: templateData ? (templateData.color as string) : null,
 		};
 	});
@@ -199,7 +207,10 @@ export async function getWorkoutsForDate(
 	supabaseUserId: string,
 	date: string
 ): Promise<WorkoutWithExercises[]> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const { data, error } = await supabase
 		.from("workouts")
@@ -236,7 +247,7 @@ export async function getWorkoutsForDate(
 			.sort((a, b) => a.sortOrder - b.sortOrder);
 
 		return {
-			...mapWorkoutRow(row as unknown as Record<string, unknown>),
+			...mapWorkoutRow(row as Tables<"workouts">),
 			color: templateData ? (templateData.color as string) : null,
 			exercises,
 		};
@@ -247,7 +258,10 @@ export async function getWorkoutDetail(
 	workoutId: string,
 	supabaseUserId: string
 ): Promise<WorkoutWithExercises | null> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const { data, error } = await supabase
 		.from("workouts")
@@ -285,7 +299,7 @@ export async function getWorkoutDetail(
 		.sort((a, b) => a.sortOrder - b.sortOrder);
 
 	return {
-		...mapWorkoutRow(data as unknown as Record<string, unknown>),
+		...mapWorkoutRow(data as Tables<"workouts">),
 		color: templateData ? (templateData.color as string) : null,
 		exercises,
 	};
@@ -304,7 +318,10 @@ export async function getExerciseHistory(
 	supabaseUserId: string,
 	limit = 10
 ): Promise<ExerciseHistoryEntry[]> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const { data, error } = await supabase
 		.from("workout_exercises")
@@ -331,8 +348,7 @@ export async function getExerciseHistory(
 		const workoutData = row.workouts as unknown as Record<string, unknown>;
 		if (!workoutData) continue;
 
-		const setsData =
-			(row.exercise_sets as unknown as Record<string, unknown>[]) ?? [];
+		const setsData = (row.exercise_sets as Tables<"exercise_sets">[]) ?? [];
 
 		entries.push({
 			date: workoutData.date as string,

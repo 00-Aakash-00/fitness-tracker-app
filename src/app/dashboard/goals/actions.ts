@@ -1,10 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { isValidDateString } from "@/lib/date";
-import { getSupabaseUserIdByClerkId } from "@/lib/integrations/oauth-connections.server";
-import { createAdminClient } from "@/lib/supabase";
+import type { AppSupabaseClient } from "@/lib/supabase";
+import { getAuthenticatedSupabaseContext } from "@/lib/supabase-user.server";
 
 export type GoalsActionResult = {
 	status: "success" | "error";
@@ -36,8 +35,10 @@ function parseChallengeTasks(
 	}
 }
 
-async function deleteChallengeById(challengeId: string): Promise<void> {
-	const supabase = createAdminClient();
+async function deleteChallengeById(
+	supabase: AppSupabaseClient,
+	challengeId: string
+): Promise<void> {
 	const { error } = await supabase
 		.from("challenges")
 		.delete()
@@ -51,13 +52,10 @@ async function deleteChallengeById(challengeId: string): Promise<void> {
 export async function createChallenge(
 	formData: FormData
 ): Promise<GoalsActionResult> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-	const supabase = createAdminClient();
 
 	const rawName = formData.get("name");
 	const rawDescription = formData.get("description");
@@ -103,10 +101,10 @@ export async function createChallenge(
 	}
 
 	// Insert challenge
-	const { data: challenge, error: challengeError } = await supabase
+	const { data: challenge, error: challengeError } = await context.supabase
 		.from("challenges")
 		.insert({
-			user_id: supabaseUserId,
+			user_id: context.supabaseUserId,
 			name: name.trim(),
 			description: description.trim(),
 			duration,
@@ -130,13 +128,13 @@ export async function createChallenge(
 		sort_order: index,
 	}));
 
-	const { error: taskError } = await supabase
+	const { error: taskError } = await context.supabase
 		.from("challenge_tasks")
 		.insert(taskInserts);
 
 	if (taskError) {
 		console.error("Error creating challenge tasks:", taskError);
-		await deleteChallengeById(challenge.id);
+		await deleteChallengeById(context.supabase, challenge.id);
 		return {
 			status: "error",
 			message: "Failed to create challenge tasks.",
@@ -154,13 +152,10 @@ export async function createChallenge(
 export async function toggleTaskCompletion(
 	formData: FormData
 ): Promise<GoalsActionResult> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-	const supabase = createAdminClient();
 
 	const challengeId = formData.get("challengeId") as string;
 	const taskId = formData.get("taskId") as string;
@@ -176,11 +171,11 @@ export async function toggleTaskCompletion(
 	}
 
 	// Verify the challenge belongs to the authenticated user
-	const { data: challenge, error: challengeError } = await supabase
+	const { data: challenge, error: challengeError } = await context.supabase
 		.from("challenges")
 		.select("id")
 		.eq("id", challengeId)
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.maybeSingle();
 
 	if (challengeError) {
@@ -192,7 +187,7 @@ export async function toggleTaskCompletion(
 		return { status: "error", message: "Challenge not found." };
 	}
 
-	const { data: task, error: taskError } = await supabase
+	const { data: task, error: taskError } = await context.supabase
 		.from("challenge_tasks")
 		.select("id")
 		.eq("id", taskId)
@@ -213,7 +208,7 @@ export async function toggleTaskCompletion(
 
 	if (isCompleted) {
 		// Currently completed -> delete
-		const { error } = await supabase
+		const { error } = await context.supabase
 			.from("daily_completions")
 			.delete()
 			.eq("challenge_id", challengeId)
@@ -226,7 +221,7 @@ export async function toggleTaskCompletion(
 		}
 	} else {
 		// Not completed -> insert
-		const { error } = await supabase.from("daily_completions").insert({
+		const { error } = await context.supabase.from("daily_completions").insert({
 			challenge_id: challengeId,
 			task_id: taskId,
 			completed_date: completedDate,
@@ -246,13 +241,10 @@ export async function toggleTaskCompletion(
 export async function updateChallengeStatus(
 	formData: FormData
 ): Promise<GoalsActionResult> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-	const supabase = createAdminClient();
 
 	const challengeId = formData.get("challengeId") as string;
 	const status = formData.get("status") as string;
@@ -261,17 +253,17 @@ export async function updateChallengeStatus(
 		return { status: "error", message: "Missing required fields." };
 	}
 
-	const validStatuses = ["active", "paused", "completed", "abandoned"];
-	if (!validStatuses.includes(status)) {
+	const validStatuses = ["active", "paused", "completed", "abandoned"] as const;
+	if (!validStatuses.includes(status as (typeof validStatuses)[number])) {
 		return { status: "error", message: "Invalid status." };
 	}
 
 	// Verify ownership
-	const { data: challenge, error: verifyError } = await supabase
+	const { data: challenge, error: verifyError } = await context.supabase
 		.from("challenges")
 		.select("id")
 		.eq("id", challengeId)
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.maybeSingle();
 
 	if (verifyError) {
@@ -283,9 +275,12 @@ export async function updateChallengeStatus(
 		return { status: "error", message: "Challenge not found." };
 	}
 
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("challenges")
-		.update({ status, updated_at: new Date().toISOString() })
+		.update({
+			status: status as (typeof validStatuses)[number],
+			updated_at: new Date().toISOString(),
+		})
 		.eq("id", challengeId);
 
 	if (error) {
@@ -301,13 +296,10 @@ export async function updateChallengeStatus(
 export async function deleteChallenge(
 	formData: FormData
 ): Promise<GoalsActionResult> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-	const supabase = createAdminClient();
 
 	const challengeId = formData.get("challengeId") as string;
 
@@ -316,11 +308,11 @@ export async function deleteChallenge(
 	}
 
 	// Verify ownership
-	const { data: challenge, error: verifyError } = await supabase
+	const { data: challenge, error: verifyError } = await context.supabase
 		.from("challenges")
 		.select("id")
 		.eq("id", challengeId)
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.maybeSingle();
 
 	if (verifyError) {
@@ -333,7 +325,7 @@ export async function deleteChallenge(
 	}
 
 	// Delete challenge (cascade will remove tasks and completions)
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("challenges")
 		.delete()
 		.eq("id", challengeId);

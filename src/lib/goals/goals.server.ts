@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createAdminClient } from "@/lib/supabase";
+import { getUserSupabaseClient } from "@/lib/supabase-user.server";
+import type { Tables } from "@/types/database";
 import type {
 	ChallengeDetail,
 	ChallengeTask,
@@ -12,37 +13,37 @@ import { calculateStreaks } from "./goals.utils";
 /**
  * Map a Supabase row to the Challenge type (snake_case → camelCase).
  */
-function mapChallengeRow(row: Record<string, unknown>) {
+function mapChallengeRow(row: Tables<"challenges">) {
 	return {
-		id: row.id as string,
-		userId: row.user_id as string,
-		name: row.name as string,
-		description: (row.description as string) ?? "",
-		duration: row.duration as number,
-		startDate: row.start_date as string,
-		timezone: (row.timezone as string) ?? "UTC",
-		status: row.status as string,
-		templateId: (row.template_id as string) ?? null,
-		createdAt: row.created_at as string,
-		updatedAt: row.updated_at as string,
+		id: row.id,
+		userId: row.user_id,
+		name: row.name,
+		description: row.description ?? "",
+		duration: row.duration,
+		startDate: row.start_date,
+		timezone: row.timezone ?? "UTC",
+		status: row.status,
+		templateId: row.template_id,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
 	};
 }
 
-function mapTaskRow(row: Record<string, unknown>): ChallengeTask {
+function mapTaskRow(row: Tables<"challenge_tasks">): ChallengeTask {
 	return {
-		id: row.id as string,
-		challengeId: row.challenge_id as string,
-		label: row.label as string,
-		sortOrder: row.sort_order as number,
+		id: row.id,
+		challengeId: row.challenge_id,
+		label: row.label,
+		sortOrder: row.sort_order,
 	};
 }
 
-function mapCompletionRow(row: Record<string, unknown>): DailyCompletion {
+function mapCompletionRow(row: Tables<"daily_completions">): DailyCompletion {
 	return {
-		id: row.id as string,
-		challengeId: row.challenge_id as string,
-		taskId: row.task_id as string,
-		completedDate: row.completed_date as string,
+		id: row.id,
+		challengeId: row.challenge_id,
+		taskId: row.task_id,
+		completedDate: row.completed_date,
 	};
 }
 
@@ -53,7 +54,10 @@ function mapCompletionRow(row: Record<string, unknown>): DailyCompletion {
 export async function getUserChallenges(
 	supabaseUserId: string
 ): Promise<ChallengeWithTasks[]> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const { data: challengeRows, error: challengeError } = await supabase
 		.from("challenges")
@@ -70,9 +74,8 @@ export async function getUserChallenges(
 		return [];
 	}
 
-	const challengeIds = challengeRows.map(
-		(r: Record<string, unknown>) => r.id as string
-	);
+	const typedChallengeRows = challengeRows as Tables<"challenges">[];
+	const challengeIds = typedChallengeRows.map((row) => row.id);
 
 	const { data: taskRows, error: taskError } = await supabase
 		.from("challenge_tasks")
@@ -86,7 +89,7 @@ export async function getUserChallenges(
 
 	// Group tasks by challenge_id
 	const tasksByChallenge = new Map<string, ChallengeTask[]>();
-	for (const row of taskRows ?? []) {
+	for (const row of (taskRows ?? []) as Tables<"challenge_tasks">[]) {
 		const task = mapTaskRow(row);
 		const existing = tasksByChallenge.get(task.challengeId) ?? [];
 		existing.push(task);
@@ -101,15 +104,13 @@ export async function getUserChallenges(
 		abandoned: 3,
 	};
 
-	const challenges: ChallengeWithTasks[] = challengeRows.map(
-		(row: Record<string, unknown>) => {
-			const challenge = mapChallengeRow(row);
-			return {
-				...challenge,
-				tasks: tasksByChallenge.get(challenge.id) ?? [],
-			} as ChallengeWithTasks;
-		}
-	);
+	const challenges: ChallengeWithTasks[] = typedChallengeRows.map((row) => {
+		const challenge = mapChallengeRow(row);
+		return {
+			...challenge,
+			tasks: tasksByChallenge.get(challenge.id) ?? [],
+		};
+	});
 
 	challenges.sort((a, b) => {
 		const aOrder = statusOrder[a.status] ?? 99;
@@ -129,7 +130,10 @@ export async function getChallengeDetail(
 	challengeId: string,
 	supabaseUserId: string
 ): Promise<ChallengeDetail | null> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	// Fetch challenge
 	const { data: challengeRow, error: challengeError } = await supabase
@@ -147,7 +151,7 @@ export async function getChallengeDetail(
 		return null;
 	}
 
-	const challenge = mapChallengeRow(challengeRow);
+	const challenge = mapChallengeRow(challengeRow as Tables<"challenges">);
 
 	// Fetch tasks
 	const { data: taskRows, error: taskError } = await supabase
@@ -160,7 +164,9 @@ export async function getChallengeDetail(
 		throw taskError;
 	}
 
-	const tasks = (taskRows ?? []).map(mapTaskRow);
+	const tasks = ((taskRows ?? []) as Tables<"challenge_tasks">[]).map(
+		mapTaskRow
+	);
 
 	// Fetch all completions
 	const { data: completionRows, error: completionError } = await supabase
@@ -172,7 +178,9 @@ export async function getChallengeDetail(
 		throw completionError;
 	}
 
-	const completions = (completionRows ?? []).map(mapCompletionRow);
+	const completions = (
+		(completionRows ?? []) as Tables<"daily_completions">[]
+	).map(mapCompletionRow);
 
 	// Calculate stats
 	const stats = calculateStreaks(
@@ -188,7 +196,7 @@ export async function getChallengeDetail(
 		tasks,
 		completions,
 		stats,
-	} as ChallengeDetail;
+	};
 }
 
 /**
@@ -198,7 +206,10 @@ export async function getCompletionsForDate(
 	challengeId: string,
 	date: string
 ): Promise<DailyCompletion[]> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const { data, error } = await supabase
 		.from("daily_completions")
@@ -210,7 +221,7 @@ export async function getCompletionsForDate(
 		throw error;
 	}
 
-	return (data ?? []).map(mapCompletionRow);
+	return ((data ?? []) as Tables<"daily_completions">[]).map(mapCompletionRow);
 }
 
 /**
@@ -221,7 +232,10 @@ export async function getCompletionsForChallenges(
 ): Promise<DailyCompletion[]> {
 	if (challengeIds.length === 0) return [];
 
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	const { data, error } = await supabase
 		.from("daily_completions")
@@ -232,5 +246,5 @@ export async function getCompletionsForChallenges(
 		throw error;
 	}
 
-	return (data ?? []).map(mapCompletionRow);
+	return ((data ?? []) as Tables<"daily_completions">[]).map(mapCompletionRow);
 }

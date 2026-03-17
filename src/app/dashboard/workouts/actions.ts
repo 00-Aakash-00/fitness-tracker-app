@@ -1,9 +1,12 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { getSupabaseUserIdByClerkId } from "@/lib/integrations/oauth-connections.server";
-import { createAdminClient } from "@/lib/supabase";
+import type { AppSupabaseClient } from "@/lib/supabase";
+import {
+	type AuthenticatedSupabaseContext,
+	getAuthenticatedSupabaseContext,
+} from "@/lib/supabase-user.server";
+import type { TablesInsert } from "@/types/database";
 
 type ActionResult = {
 	status: "success" | "error";
@@ -22,7 +25,7 @@ type TemplateExerciseInput = {
 type TemplateSnapshot = {
 	name: string;
 	description: string | null;
-	color: string;
+	color: string | null;
 	exercises: TemplateExerciseInput[];
 };
 
@@ -41,10 +44,8 @@ function getNumber(formData: FormData, key: string): number | null {
 	return Number.isFinite(num) ? num : null;
 }
 
-async function getAuthenticatedUserId(): Promise<string | null> {
-	const { userId } = await auth();
-	if (!userId) return null;
-	return getSupabaseUserIdByClerkId(userId);
+async function getAuthenticatedWorkoutContext(): Promise<AuthenticatedSupabaseContext | null> {
+	return getAuthenticatedSupabaseContext();
 }
 
 function parseTemplateExercises(rawValue: string | null): {
@@ -126,8 +127,10 @@ function parseTemplateExercises(rawValue: string | null): {
 	return { exercises };
 }
 
-async function deleteTemplateById(templateId: string): Promise<void> {
-	const supabase = createAdminClient();
+async function deleteTemplateById(
+	supabase: AppSupabaseClient,
+	templateId: string
+): Promise<void> {
 	const { error } = await supabase
 		.from("workout_templates")
 		.delete()
@@ -138,8 +141,10 @@ async function deleteTemplateById(templateId: string): Promise<void> {
 	}
 }
 
-async function deleteWorkoutById(workoutId: string): Promise<void> {
-	const supabase = createAdminClient();
+async function deleteWorkoutById(
+	supabase: AppSupabaseClient,
+	workoutId: string
+): Promise<void> {
 	const { error } = await supabase
 		.from("workouts")
 		.delete()
@@ -151,9 +156,9 @@ async function deleteWorkoutById(workoutId: string): Promise<void> {
 }
 
 async function deleteWorkoutExerciseById(
+	supabase: AppSupabaseClient,
 	workoutExerciseId: string
 ): Promise<void> {
-	const supabase = createAdminClient();
 	const { error } = await supabase
 		.from("workout_exercises")
 		.delete()
@@ -165,11 +170,10 @@ async function deleteWorkoutExerciseById(
 }
 
 async function restoreTemplateSnapshot(
+	supabase: AppSupabaseClient,
 	templateId: string,
 	snapshot: TemplateSnapshot
 ): Promise<void> {
-	const supabase = createAdminClient();
-
 	const { error: metadataError } = await supabase
 		.from("workout_templates")
 		.update({
@@ -226,8 +230,8 @@ async function restoreTemplateSnapshot(
 export async function createTemplate(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -246,13 +250,11 @@ export async function createTemplate(
 		return { status: "error", message: exercisesError };
 	}
 
-	const supabase = createAdminClient();
-
 	// Get the next sort order
-	const { data: existing } = await supabase
+	const { data: existing } = await context.supabase
 		.from("workout_templates")
 		.select("sort_order")
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.order("sort_order", { ascending: false })
 		.limit(1);
 
@@ -262,10 +264,10 @@ export async function createTemplate(
 			: 0;
 
 	// Insert the template
-	const { data: template, error: templateError } = await supabase
+	const { data: template, error: templateError } = await context.supabase
 		.from("workout_templates")
 		.insert({
-			user_id: supabaseUserId,
+			user_id: context.supabaseUserId,
 			name,
 			description,
 			color,
@@ -292,13 +294,13 @@ export async function createTemplate(
 			rest_seconds: exercise.restSeconds,
 		}));
 
-		const { error: exError } = await supabase
+		const { error: exError } = await context.supabase
 			.from("template_exercises")
 			.insert(rows);
 
 		if (exError) {
 			console.error("Error adding template exercises:", exError);
-			await deleteTemplateById(template.id);
+			await deleteTemplateById(context.supabase, template.id);
 			return {
 				status: "error",
 				message: "Failed to create template exercises.",
@@ -313,8 +315,8 @@ export async function createTemplate(
 export async function updateTemplate(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -338,14 +340,12 @@ export async function updateTemplate(
 		return { status: "error", message: exercisesError };
 	}
 
-	const supabase = createAdminClient();
-
 	// Verify ownership
-	const { data: existingTemplate } = await supabase
+	const { data: existingTemplate } = await context.supabase
 		.from("workout_templates")
 		.select("id, name, description, color")
 		.eq("id", templateId)
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.maybeSingle();
 
 	if (!existingTemplate) {
@@ -353,7 +353,7 @@ export async function updateTemplate(
 	}
 
 	const { data: previousExercises, error: previousExercisesError } =
-		await supabase
+		await context.supabase
 			.from("template_exercises")
 			.select(
 				"exercise_id, sort_order, target_sets, target_reps, target_weight, notes, rest_seconds"
@@ -370,22 +370,22 @@ export async function updateTemplate(
 	}
 
 	const snapshot: TemplateSnapshot = {
-		name: existingTemplate.name as string,
-		description: (existingTemplate.description as string) ?? null,
-		color: existingTemplate.color as string,
+		name: existingTemplate.name,
+		description: existingTemplate.description,
+		color: existingTemplate.color,
 		exercises: (previousExercises ?? []).map((exercise) => ({
-			exerciseId: exercise.exercise_id as string,
-			targetSets: (exercise.target_sets as number) ?? null,
-			targetReps: (exercise.target_reps as string) ?? null,
+			exerciseId: exercise.exercise_id,
+			targetSets: exercise.target_sets ?? null,
+			targetReps: exercise.target_reps ?? null,
 			targetWeight:
 				exercise.target_weight !== null ? Number(exercise.target_weight) : null,
-			notes: (exercise.notes as string) ?? null,
-			restSeconds: (exercise.rest_seconds as number) ?? null,
+			notes: exercise.notes ?? null,
+			restSeconds: exercise.rest_seconds ?? null,
 		})),
 	};
 
 	// Update template
-	const { error: updateError } = await supabase
+	const { error: updateError } = await context.supabase
 		.from("workout_templates")
 		.update({
 			name,
@@ -394,14 +394,14 @@ export async function updateTemplate(
 			updated_at: new Date().toISOString(),
 		})
 		.eq("id", templateId)
-		.eq("user_id", supabaseUserId);
+		.eq("user_id", context.supabaseUserId);
 
 	if (updateError) {
 		console.error("Error updating template:", updateError);
 		return { status: "error", message: "Failed to update template." };
 	}
 
-	const { error: deleteExercisesError } = await supabase
+	const { error: deleteExercisesError } = await context.supabase
 		.from("template_exercises")
 		.delete()
 		.eq("template_id", templateId);
@@ -411,7 +411,7 @@ export async function updateTemplate(
 			"Error clearing existing template exercises:",
 			deleteExercisesError
 		);
-		await restoreTemplateSnapshot(templateId, snapshot);
+		await restoreTemplateSnapshot(context.supabase, templateId, snapshot);
 		return {
 			status: "error",
 			message: "Failed to update template exercises.",
@@ -430,13 +430,13 @@ export async function updateTemplate(
 			rest_seconds: exercise.restSeconds,
 		}));
 
-		const { error: exError } = await supabase
+		const { error: exError } = await context.supabase
 			.from("template_exercises")
 			.insert(rows);
 
 		if (exError) {
 			console.error("Error updating template exercises:", exError);
-			await restoreTemplateSnapshot(templateId, snapshot);
+			await restoreTemplateSnapshot(context.supabase, templateId, snapshot);
 			return {
 				status: "error",
 				message: "Failed to update template exercises.",
@@ -451,8 +451,8 @@ export async function updateTemplate(
 export async function deleteTemplate(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -461,13 +461,11 @@ export async function deleteTemplate(
 		return { status: "error", message: "Template ID is required." };
 	}
 
-	const supabase = createAdminClient();
-
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("workout_templates")
 		.delete()
 		.eq("id", templateId)
-		.eq("user_id", supabaseUserId);
+		.eq("user_id", context.supabaseUserId);
 
 	if (error) {
 		console.error("Error deleting template:", error);
@@ -483,8 +481,8 @@ export async function deleteTemplate(
 export async function createWorkoutFromTemplate(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -499,10 +497,8 @@ export async function createWorkoutFromTemplate(
 		return { status: "error", message: "Invalid date." };
 	}
 
-	const supabase = createAdminClient();
-
 	// Fetch the template and its exercises
-	const { data: template, error: templateError } = await supabase
+	const { data: template, error: templateError } = await context.supabase
 		.from("workout_templates")
 		.select(
 			`
@@ -513,7 +509,7 @@ export async function createWorkoutFromTemplate(
 		`
 		)
 		.eq("id", templateId)
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.maybeSingle();
 
 	if (templateError || !template) {
@@ -521,10 +517,10 @@ export async function createWorkoutFromTemplate(
 	}
 
 	// Create the workout
-	const { data: workout, error: workoutError } = await supabase
+	const { data: workout, error: workoutError } = await context.supabase
 		.from("workouts")
 		.insert({
-			user_id: supabaseUserId,
+			user_id: context.supabaseUserId,
 			template_id: templateId,
 			name: template.name as string,
 			date,
@@ -554,14 +550,14 @@ export async function createWorkoutFromTemplate(
 			notes: (te.notes as string) ?? null,
 		}));
 
-		const { data: insertedExercises, error: weError } = await supabase
+		const { data: insertedExercises, error: weError } = await context.supabase
 			.from("workout_exercises")
 			.insert(workoutExerciseRows)
 			.select("id, exercise_id, sort_order");
 
 		if (weError) {
 			console.error("Error adding workout exercises:", weError);
-			await deleteWorkoutById(workout.id);
+			await deleteWorkoutById(context.supabase, workout.id);
 			return {
 				status: "error",
 				message: "Failed to create workout exercises.",
@@ -570,7 +566,7 @@ export async function createWorkoutFromTemplate(
 
 		if (insertedExercises) {
 			// Create empty exercise sets based on target_sets
-			const setRows: Array<Record<string, unknown>> = [];
+			const setRows: TablesInsert<"exercise_sets">[] = [];
 
 			for (const we of insertedExercises) {
 				// Find the matching template exercise
@@ -584,7 +580,11 @@ export async function createWorkoutFromTemplate(
 						workout_exercise_id: we.id,
 						set_number: s,
 						set_type: "working",
-						weight: matchingTe?.target_weight ?? null,
+						weight:
+							matchingTe?.target_weight !== null &&
+							matchingTe?.target_weight !== undefined
+								? Number(matchingTe.target_weight)
+								: null,
 						reps: null,
 						rpe: null,
 						is_completed: false,
@@ -594,13 +594,13 @@ export async function createWorkoutFromTemplate(
 			}
 
 			if (setRows.length > 0) {
-				const { error: setError } = await supabase
+				const { error: setError } = await context.supabase
 					.from("exercise_sets")
 					.insert(setRows);
 
 				if (setError) {
 					console.error("Error creating exercise sets:", setError);
-					await deleteWorkoutById(workout.id);
+					await deleteWorkoutById(context.supabase, workout.id);
 					return {
 						status: "error",
 						message: "Failed to create workout sets.",
@@ -617,8 +617,8 @@ export async function createWorkoutFromTemplate(
 export async function createEmptyWorkout(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -629,10 +629,8 @@ export async function createEmptyWorkout(
 		return { status: "error", message: "Invalid date." };
 	}
 
-	const supabase = createAdminClient();
-
-	const { error } = await supabase.from("workouts").insert({
-		user_id: supabaseUserId,
+	const { error } = await context.supabase.from("workouts").insert({
+		user_id: context.supabaseUserId,
 		name,
 		date,
 		status: "planned",
@@ -650,8 +648,8 @@ export async function createEmptyWorkout(
 export async function addExerciseToWorkout(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -665,14 +663,12 @@ export async function addExerciseToWorkout(
 		};
 	}
 
-	const supabase = createAdminClient();
-
 	// Verify ownership
-	const { data: workout } = await supabase
+	const { data: workout } = await context.supabase
 		.from("workouts")
 		.select("id")
 		.eq("id", workoutId)
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.maybeSingle();
 
 	if (!workout) {
@@ -680,7 +676,7 @@ export async function addExerciseToWorkout(
 	}
 
 	// Get the next sort order
-	const { data: existingExercises } = await supabase
+	const { data: existingExercises } = await context.supabase
 		.from("workout_exercises")
 		.select("sort_order")
 		.eq("workout_id", workoutId)
@@ -693,7 +689,7 @@ export async function addExerciseToWorkout(
 			: 0;
 
 	// Insert the workout exercise
-	const { data: newWe, error: weError } = await supabase
+	const { data: newWe, error: weError } = await context.supabase
 		.from("workout_exercises")
 		.insert({
 			workout_id: workoutId,
@@ -713,16 +709,18 @@ export async function addExerciseToWorkout(
 	}
 
 	// Create one default working set
-	const { error: setError } = await supabase.from("exercise_sets").insert({
-		workout_exercise_id: newWe.id,
-		set_number: 1,
-		set_type: "working",
-		is_completed: false,
-	});
+	const { error: setError } = await context.supabase
+		.from("exercise_sets")
+		.insert({
+			workout_exercise_id: newWe.id,
+			set_number: 1,
+			set_type: "working",
+			is_completed: false,
+		});
 
 	if (setError) {
 		console.error("Error creating default set:", setError);
-		await deleteWorkoutExerciseById(newWe.id);
+		await deleteWorkoutExerciseById(context.supabase, newWe.id);
 		return {
 			status: "error",
 			message: "Failed to add the default set for this exercise.",
@@ -736,8 +734,8 @@ export async function addExerciseToWorkout(
 export async function removeExerciseFromWorkout(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -750,10 +748,8 @@ export async function removeExerciseFromWorkout(
 		};
 	}
 
-	const supabase = createAdminClient();
-
 	// Verify ownership via join
-	const { data: we } = await supabase
+	const { data: we } = await context.supabase
 		.from("workout_exercises")
 		.select("id, workouts (user_id)")
 		.eq("id", workoutExerciseId)
@@ -764,12 +760,12 @@ export async function removeExerciseFromWorkout(
 	}
 
 	const workoutData = we.workouts as unknown as Record<string, unknown>;
-	if (workoutData?.user_id !== supabaseUserId) {
+	if (workoutData?.user_id !== context.supabaseUserId) {
 		return { status: "error", message: "Not authorized." };
 	}
 
 	// CASCADE will delete exercise_sets
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("workout_exercises")
 		.delete()
 		.eq("id", workoutExerciseId);
@@ -791,20 +787,27 @@ export async function removeExerciseFromWorkout(
 export async function upsertSet(
 	formData: FormData
 ): Promise<ActionResult & { setId?: string }> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
 	const setId = getString(formData, "setId");
 	const workoutExerciseId = getString(formData, "workoutExerciseId");
 	const setNumber = getNumber(formData, "setNumber");
-	const setType = getString(formData, "setType") ?? "working";
+	const rawSetType = getString(formData, "setType") ?? "working";
 	const weight = getNumber(formData, "weight");
 	const reps = getNumber(formData, "reps");
 	const rpe = getNumber(formData, "rpe");
 	const isCompletedRaw = getString(formData, "isCompleted");
 	const isCompleted = isCompletedRaw === "true";
+	const validSetTypes = ["warmup", "working", "dropset", "failure"] as const;
+
+	if (!validSetTypes.includes(rawSetType as (typeof validSetTypes)[number])) {
+		return { status: "error", message: "Invalid set type." };
+	}
+
+	const setType = rawSetType as TablesInsert<"exercise_sets">["set_type"];
 
 	if (!workoutExerciseId) {
 		return {
@@ -813,10 +816,8 @@ export async function upsertSet(
 		};
 	}
 
-	const supabase = createAdminClient();
-
 	// Verify ownership via join
-	const { data: we } = await supabase
+	const { data: we } = await context.supabase
 		.from("workout_exercises")
 		.select("id, workouts (user_id)")
 		.eq("id", workoutExerciseId)
@@ -827,13 +828,13 @@ export async function upsertSet(
 	}
 
 	const workoutData = we.workouts as unknown as Record<string, unknown>;
-	if (workoutData?.user_id !== supabaseUserId) {
+	if (workoutData?.user_id !== context.supabaseUserId) {
 		return { status: "error", message: "Not authorized." };
 	}
 
 	if (setId) {
 		// Update existing set
-		const { error } = await supabase
+		const { error } = await context.supabase
 			.from("exercise_sets")
 			.update({
 				set_type: setType,
@@ -862,7 +863,7 @@ export async function upsertSet(
 	// Determine set number if not provided
 	let newSetNumber = setNumber;
 	if (newSetNumber === null) {
-		const { data: existingSets } = await supabase
+		const { data: existingSets } = await context.supabase
 			.from("exercise_sets")
 			.select("set_number")
 			.eq("workout_exercise_id", workoutExerciseId)
@@ -875,7 +876,7 @@ export async function upsertSet(
 				: 1;
 	}
 
-	const { data: newSet, error } = await supabase
+	const { data: newSet, error } = await context.supabase
 		.from("exercise_sets")
 		.insert({
 			workout_exercise_id: workoutExerciseId,
@@ -903,8 +904,8 @@ export async function upsertSet(
 }
 
 export async function deleteSet(formData: FormData): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -913,10 +914,8 @@ export async function deleteSet(formData: FormData): Promise<ActionResult> {
 		return { status: "error", message: "Set ID is required." };
 	}
 
-	const supabase = createAdminClient();
-
 	// Verify ownership via nested join
-	const { data: setData } = await supabase
+	const { data: setData } = await context.supabase
 		.from("exercise_sets")
 		.select("id, workout_exercises (id, workouts (user_id))")
 		.eq("id", setId)
@@ -931,11 +930,11 @@ export async function deleteSet(formData: FormData): Promise<ActionResult> {
 		unknown
 	>;
 	const workoutData = weData?.workouts as Record<string, unknown>;
-	if (workoutData?.user_id !== supabaseUserId) {
+	if (workoutData?.user_id !== context.supabaseUserId) {
 		return { status: "error", message: "Not authorized." };
 	}
 
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("exercise_sets")
 		.delete()
 		.eq("id", setId);
@@ -954,8 +953,8 @@ export async function deleteSet(formData: FormData): Promise<ActionResult> {
 export async function updateWorkoutStatus(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -974,8 +973,6 @@ export async function updateWorkoutStatus(
 		return { status: "error", message: "Invalid status." };
 	}
 
-	const supabase = createAdminClient();
-
 	const updateData: Record<string, unknown> = {
 		status,
 		updated_at: new Date().toISOString(),
@@ -987,11 +984,11 @@ export async function updateWorkoutStatus(
 		updateData.completed_at = new Date().toISOString();
 
 		// Calculate duration if started_at exists
-		const { data: existing } = await supabase
+		const { data: existing } = await context.supabase
 			.from("workouts")
 			.select("started_at")
 			.eq("id", workoutId)
-			.eq("user_id", supabaseUserId)
+			.eq("user_id", context.supabaseUserId)
 			.maybeSingle();
 
 		if (existing?.started_at) {
@@ -1002,11 +999,11 @@ export async function updateWorkoutStatus(
 		}
 	}
 
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("workouts")
 		.update(updateData)
 		.eq("id", workoutId)
-		.eq("user_id", supabaseUserId);
+		.eq("user_id", context.supabaseUserId);
 
 	if (error) {
 		console.error("Error updating workout status:", error);
@@ -1021,8 +1018,8 @@ export async function updateWorkoutStatus(
 }
 
 export async function deleteWorkout(formData: FormData): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -1031,14 +1028,12 @@ export async function deleteWorkout(formData: FormData): Promise<ActionResult> {
 		return { status: "error", message: "Workout ID is required." };
 	}
 
-	const supabase = createAdminClient();
-
 	// CASCADE will delete workout_exercises and exercise_sets
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("workouts")
 		.delete()
 		.eq("id", workoutId)
-		.eq("user_id", supabaseUserId);
+		.eq("user_id", context.supabaseUserId);
 
 	if (error) {
 		console.error("Error deleting workout:", error);
@@ -1055,8 +1050,8 @@ export async function deleteWorkout(formData: FormData): Promise<ActionResult> {
 export async function toggleExerciseComplete(
 	formData: FormData
 ): Promise<ActionResult> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -1072,10 +1067,8 @@ export async function toggleExerciseComplete(
 
 	const isCompleted = isCompletedRaw === "true";
 
-	const supabase = createAdminClient();
-
 	// Verify ownership
-	const { data: we } = await supabase
+	const { data: we } = await context.supabase
 		.from("workout_exercises")
 		.select("id, workouts (user_id)")
 		.eq("id", workoutExerciseId)
@@ -1086,11 +1079,11 @@ export async function toggleExerciseComplete(
 	}
 
 	const workoutData = we.workouts as unknown as Record<string, unknown>;
-	if (workoutData?.user_id !== supabaseUserId) {
+	if (workoutData?.user_id !== context.supabaseUserId) {
 		return { status: "error", message: "Not authorized." };
 	}
 
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("workout_exercises")
 		.update({ is_completed: isCompleted })
 		.eq("id", workoutExerciseId);
@@ -1104,7 +1097,7 @@ export async function toggleExerciseComplete(
 	}
 
 	// Also mark all sets as completed/uncompleted
-	const { error: setsError } = await supabase
+	const { error: setsError } = await context.supabase
 		.from("exercise_sets")
 		.update({ is_completed: isCompleted })
 		.eq("workout_exercise_id", workoutExerciseId);
@@ -1122,8 +1115,8 @@ export async function toggleExerciseComplete(
 export async function createCustomExercise(
 	formData: FormData
 ): Promise<ActionResult & { exerciseId?: string }> {
-	const supabaseUserId = await getAuthenticatedUserId();
-	if (!supabaseUserId) {
+	const context = await getAuthenticatedWorkoutContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
 
@@ -1135,12 +1128,10 @@ export async function createCustomExercise(
 	const muscleGroup = getString(formData, "muscleGroup");
 	const equipment = getString(formData, "equipment");
 
-	const supabase = createAdminClient();
-
-	const { data, error } = await supabase
+	const { data, error } = await context.supabase
 		.from("exercises")
 		.insert({
-			user_id: supabaseUserId,
+			user_id: context.supabaseUserId,
 			name,
 			muscle_group: muscleGroup,
 			equipment,

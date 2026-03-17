@@ -1,10 +1,11 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { getSupabaseUserIdByClerkId } from "@/lib/integrations/oauth-connections.server";
 import type { Meal, NutritionGoals } from "@/lib/nutrition/utils";
-import { createAdminClient } from "@/lib/supabase";
+import {
+	getAuthenticatedSupabaseContext,
+	getUserSupabaseClient,
+} from "@/lib/supabase-user.server";
 
 const DEFAULT_GOALS: NutritionGoals = {
 	dailyCalories: 2000,
@@ -14,7 +15,11 @@ const DEFAULT_GOALS: NutritionGoals = {
 export async function getNutritionGoals(
 	supabaseUserId: string
 ): Promise<NutritionGoals> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
+
 	const { data, error } = await supabase
 		.from("nutrition_goals")
 		.select("daily_calories, daily_protein")
@@ -37,12 +42,10 @@ export async function getNutritionGoals(
 export async function updateNutritionGoals(
 	formData: FormData
 ): Promise<{ status: "success" | "error"; message: string }> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 
 	const rawCalories = formData.get("dailyCalories");
 	const rawProtein = formData.get("dailyProtein");
@@ -70,10 +73,9 @@ export async function updateNutritionGoals(
 		};
 	}
 
-	const supabase = createAdminClient();
-	const { error } = await supabase.from("nutrition_goals").upsert(
+	const { error } = await context.supabase.from("nutrition_goals").upsert(
 		{
-			user_id: supabaseUserId,
+			user_id: context.supabaseUserId,
 			daily_calories: calories,
 			daily_protein: protein,
 			updated_at: new Date().toISOString(),
@@ -96,7 +98,10 @@ export async function getMealsForMonth(
 	year: number,
 	month: number
 ): Promise<Record<string, Meal[]>> {
-	const supabase = createAdminClient();
+	const supabase = await getUserSupabaseClient();
+	if (!supabase) {
+		throw new Error("Supabase user client unavailable.");
+	}
 
 	// Build date range for the month
 	const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -144,12 +149,10 @@ export async function getMealsForMonth(
 export async function addMeal(
 	formData: FormData
 ): Promise<{ status: "success" | "error"; message: string }> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 
 	const name = formData.get("name");
 	const rawCalories = formData.get("calories");
@@ -189,9 +192,8 @@ export async function addMeal(
 
 	const mealSource = source === "ai" || source === "manual" ? source : "manual";
 
-	const supabase = createAdminClient();
-	const { error } = await supabase.from("meals").insert({
-		user_id: supabaseUserId,
+	const { error } = await context.supabase.from("meals").insert({
+		user_id: context.supabaseUserId,
 		meal_date: mealDate,
 		name: name.trim(),
 		calories,
@@ -215,12 +217,10 @@ export async function addMeal(
 export async function updateMeal(
 	formData: FormData
 ): Promise<{ status: "success" | "error"; message: string }> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 
 	const mealId = formData.get("mealId");
 	const name = formData.get("name");
@@ -252,21 +252,19 @@ export async function updateMeal(
 		return { status: "error", message: "Protein must be a valid number." };
 	}
 
-	const supabase = createAdminClient();
-
 	// Verify the meal belongs to this user
-	const { data: existing } = await supabase
+	const { data: existing } = await context.supabase
 		.from("meals")
 		.select("id")
 		.eq("id", mealId)
-		.eq("user_id", supabaseUserId)
+		.eq("user_id", context.supabaseUserId)
 		.maybeSingle();
 
 	if (!existing) {
 		return { status: "error", message: "Meal not found." };
 	}
 
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("meals")
 		.update({
 			name: name.trim(),
@@ -275,7 +273,7 @@ export async function updateMeal(
 			updated_at: new Date().toISOString(),
 		})
 		.eq("id", mealId)
-		.eq("user_id", supabaseUserId);
+		.eq("user_id", context.supabaseUserId);
 
 	if (error) {
 		console.error("Error updating meal:", error);
@@ -289,24 +287,21 @@ export async function updateMeal(
 export async function deleteMeal(
 	formData: FormData
 ): Promise<{ status: "success" | "error"; message: string }> {
-	const { userId } = await auth();
-	if (!userId) {
+	const context = await getAuthenticatedSupabaseContext();
+	if (!context) {
 		return { status: "error", message: "Not authenticated." };
 	}
-
-	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
 
 	const mealId = formData.get("mealId");
 	if (!mealId || typeof mealId !== "string") {
 		return { status: "error", message: "Meal ID is required." };
 	}
 
-	const supabase = createAdminClient();
-	const { error } = await supabase
+	const { error } = await context.supabase
 		.from("meals")
 		.delete()
 		.eq("id", mealId)
-		.eq("user_id", supabaseUserId);
+		.eq("user_id", context.supabaseUserId);
 
 	if (error) {
 		console.error("Error deleting meal:", error);
