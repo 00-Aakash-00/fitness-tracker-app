@@ -13,11 +13,9 @@ import { getChallengeDetail } from "@/lib/goals/goals.server";
 import { getTodayInTimezone } from "@/lib/goals/goals.utils";
 import { getSupabaseUserIdByClerkId } from "@/lib/integrations/oauth-connections.server";
 
-type Props = {
-	params: Promise<{ challengeId: string }>;
-};
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({
+	params,
+}: PageProps<"/dashboard/goals/[challengeId]">): Promise<Metadata> {
 	const { challengeId } = await params;
 	const { userId } = await auth();
 	if (!userId) return { title: "Challenge | FitnessTracker" };
@@ -45,7 +43,9 @@ const statusConfig: Record<
 	abandoned: { label: "Abandoned", variant: "destructive" },
 };
 
-export default async function ChallengeDetailPage({ params }: Props) {
+export default async function ChallengeDetailPage({
+	params,
+}: PageProps<"/dashboard/goals/[challengeId]">) {
 	const { challengeId } = await params;
 	const { userId } = await auth();
 	if (!userId) notFound();

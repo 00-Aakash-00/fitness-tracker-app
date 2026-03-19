@@ -19,15 +19,11 @@ function parseRange(value: string | string[] | undefined): ProgressRange {
 
 export default async function ProgressPage({
 	searchParams,
-}: {
-	searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}: PageProps<"/dashboard/progress">) {
 	const [{ userId }, cookieStore, resolvedSearchParams] = await Promise.all([
 		auth(),
 		cookies(),
-		(searchParams ?? Promise.resolve({})) as Promise<
-			Record<string, string | string[] | undefined>
-		>,
+		searchParams,
 	]);
 
 	if (!userId) {

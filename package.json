@@ -16,7 +16,7 @@
 		"lint:fix": "biome check --write .",
 		"format": "biome format --write .",
 		"lint:eslint": "eslint",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "next typegen && tsc --noEmit"
 	},
 	"dependencies": {
 		"@ai-sdk/groq": "^3.0.29",

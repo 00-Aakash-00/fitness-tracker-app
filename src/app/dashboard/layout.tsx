@@ -11,9 +11,7 @@ import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
 
 export default async function DashboardLayout({
 	children,
-}: {
-	children: React.ReactNode;
-}) {
+}: LayoutProps<"/dashboard">) {
 	const [{ userId }, cookieStore] = await Promise.all([auth(), cookies()]);
 	if (!userId) {
 		redirect("/sign-in");

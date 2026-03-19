@@ -21,11 +21,9 @@ import { getProgressSnapshot } from "@/lib/progress/progress.server";
 
 export default async function DashboardPage({
 	searchParams,
-}: {
-	searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}: PageProps<"/dashboard">) {
 	const [{ userId }, cookieStore] = await Promise.all([auth(), cookies()]);
-	const resolvedSearchParams = (await searchParams) ?? {};
+	const resolvedSearchParams = await searchParams;
 	const stepGoal = parseStepGoal(cookieStore.get(STEP_GOAL_COOKIE)?.value);
 	const isWhoopAvailable = isWhoopConfigured();
 	const isOuraAvailable = isOuraConfigured();

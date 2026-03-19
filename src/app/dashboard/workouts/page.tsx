@@ -16,18 +16,18 @@ export const metadata: Metadata = {
 
 export default async function WorkoutsPage({
 	searchParams,
-}: {
-	searchParams: Promise<{ date?: string }>;
-}) {
+}: PageProps<"/dashboard/workouts">) {
 	const { userId } = await auth();
 	if (!userId) {
 		return null;
 	}
 
 	const supabaseUserId = await getSupabaseUserIdByClerkId(userId);
-	const params = await searchParams;
-
-	const dateStr = normalizeDateString(params.date);
+	const resolvedSearchParams = await searchParams;
+	const dateParam = resolvedSearchParams.date;
+	const dateStr = normalizeDateString(
+		Array.isArray(dateParam) ? dateParam[0] : dateParam
+	);
 	const { year, month } = getDateParts(dateStr);
 
 	const [monthWorkouts, dayWorkouts, templates, exercises] = await Promise.all([

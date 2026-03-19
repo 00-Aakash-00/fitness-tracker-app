@@ -124,15 +124,11 @@ function getAvailableDeviceStatus(params: {
 
 export default async function DevicesPage({
 	searchParams,
-}: {
-	searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}: PageProps<"/dashboard/devices">) {
 	const [{ userId }, cookieStore, resolvedSearchParams] = await Promise.all([
 		auth(),
 		cookies(),
-		(searchParams ?? Promise.resolve({})) as Promise<
-			Record<string, string | string[] | undefined>
-		>,
+		searchParams,
 	]);
 
 	if (!userId) {
