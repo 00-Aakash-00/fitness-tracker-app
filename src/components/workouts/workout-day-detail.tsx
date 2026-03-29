@@ -89,7 +89,7 @@ export function WorkoutDayDetail({
 			</div>
 
 			{/* Template chips */}
-			{error ? <p className="text-sm text-red-500">{error}</p> : null}
+			{error ? <p className="text-sm text-destructive-text">{error}</p> : null}
 			{templates.length > 0 && (
 				<TemplateList
 					templates={templates}

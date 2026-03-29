@@ -93,7 +93,7 @@ export function DailyChecklist({
 					{completedCount}/{totalCount}
 				</span>
 			</div>
-			{error ? <p className="text-sm text-red-500">{error}</p> : null}
+			{error ? <p className="text-sm text-destructive-text">{error}</p> : null}
 			<div className="space-y-1.5">
 				{tasks.map((task) => {
 					const isCompleted = optimistic.completedTaskIds.has(task.id);

@@ -155,11 +155,11 @@ export function ChallengeActions({
 						disabled={isPending}
 						onClick={() => setShowDeleteConfirm(true)}
 					>
-						<Trash2 className="h-4 w-4 text-red-500" />
+						<Trash2 className="h-4 w-4 text-destructive-text" />
 					</Button>
 				)}
 			</div>
-			{error ? <p className="text-sm text-red-500">{error}</p> : null}
+			{error ? <p className="text-sm text-destructive-text">{error}</p> : null}
 		</div>
 	);
 }

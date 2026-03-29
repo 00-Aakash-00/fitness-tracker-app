@@ -38,7 +38,7 @@ export function TemplateList({
 
 	return (
 		<div className="space-y-2">
-			{error ? <p className="text-sm text-red-500">{error}</p> : null}
+			{error ? <p className="text-sm text-destructive-text">{error}</p> : null}
 			<div className="flex gap-2 overflow-x-auto pb-1">
 				{templates.map((t) => (
 					<div key={t.id} className="group flex shrink-0 items-center gap-1.5">

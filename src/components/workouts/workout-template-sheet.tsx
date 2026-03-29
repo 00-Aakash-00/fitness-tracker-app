@@ -324,7 +324,7 @@ function WorkoutTemplateForm({
 										<Button
 											variant="ghost"
 											size="icon"
-											className="h-6 w-6 text-secondary-text hover:text-red-500"
+											className="h-6 w-6 text-secondary-text hover:text-destructive-text"
 											onClick={() => handleRemoveExercise(index)}
 										>
 											<Trash2 className="h-3 w-3" />
@@ -446,7 +446,7 @@ function WorkoutTemplateForm({
 					</Button>
 				</div>
 
-				{error ? <p className="text-sm text-red-500">{error}</p> : null}
+				{error ? <p className="text-sm text-destructive-text">{error}</p> : null}
 			</div>
 
 			<SheetFooter className="gap-2 border-t border-border px-4 py-4 sm:flex-row sm:justify-between">

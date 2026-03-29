@@ -244,7 +244,7 @@ export function AddMealSheet({
 						</Button>
 
 						{analyzeError && (
-							<p className="text-sm text-red-500">{analyzeError}</p>
+							<p className="text-sm text-destructive-text">{analyzeError}</p>
 						)}
 
 						{aiPreview && (
@@ -333,7 +333,7 @@ export function AddMealSheet({
 					</div>
 				)}
 
-				{submitError && <p className="text-sm text-red-500">{submitError}</p>}
+				{submitError && <p className="text-sm text-destructive-text">{submitError}</p>}
 
 				<SheetFooter className="mt-4">
 					{mode === "ai" ? (

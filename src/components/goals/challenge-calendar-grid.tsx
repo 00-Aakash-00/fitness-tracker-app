@@ -120,16 +120,16 @@ export function ChallengeCalendarGrid({
 												title={`${cell.day}: ${status}`}
 												className={cn(
 													"h-7 w-7 rounded-sm sm:h-8 sm:w-8",
-													status === "complete" && "bg-emerald-500",
-													status === "partial" && "bg-amber-400",
-													status === "missed" && "bg-red-400/60",
+													status === "complete" && "bg-success",
+													status === "partial" && "bg-warning",
+													status === "missed" && "bg-destructive/60",
 													status === "future" && "bg-secondary-surface",
 													status === "today" &&
 														count >= taskCount &&
 														taskCount > 0
-														? "bg-emerald-500 ring-2 ring-brand-cool ring-offset-1 ring-offset-primary-surface"
+														? "bg-success ring-2 ring-brand-cool ring-offset-1 ring-offset-primary-surface"
 														: status === "today" && count > 0
-															? "bg-amber-400 ring-2 ring-brand-cool ring-offset-1 ring-offset-primary-surface"
+															? "bg-warning ring-2 ring-brand-cool ring-offset-1 ring-offset-primary-surface"
 															: status === "today" &&
 																"bg-secondary-surface ring-2 ring-brand-cool ring-offset-1 ring-offset-primary-surface"
 												)}
@@ -144,15 +144,15 @@ export function ChallengeCalendarGrid({
 					{/* Legend */}
 					<div className="mt-3 flex flex-wrap items-center gap-3 font-secondary text-[10px] text-secondary-text">
 						<div className="flex items-center gap-1">
-							<div className="h-3 w-3 rounded-sm bg-emerald-500" />
+							<div className="h-3 w-3 rounded-sm bg-success" />
 							<span>Complete</span>
 						</div>
 						<div className="flex items-center gap-1">
-							<div className="h-3 w-3 rounded-sm bg-amber-400" />
+							<div className="h-3 w-3 rounded-sm bg-warning" />
 							<span>Partial</span>
 						</div>
 						<div className="flex items-center gap-1">
-							<div className="h-3 w-3 rounded-sm bg-red-400/60" />
+							<div className="h-3 w-3 rounded-sm bg-destructive/60" />
 							<span>Missed</span>
 						</div>
 						<div className="flex items-center gap-1">

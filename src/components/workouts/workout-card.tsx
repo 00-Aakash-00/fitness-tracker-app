@@ -95,7 +95,7 @@ export function WorkoutCard({ workout, onAddExercise }: WorkoutCardProps) {
 							<Button
 								variant="ghost"
 								size="sm"
-								className="h-7 text-xs text-green-600"
+								className="h-7 text-xs text-success-text"
 								onClick={() => handleStatusChange("completed")}
 								disabled={isPending}
 							>
@@ -106,7 +106,7 @@ export function WorkoutCard({ workout, onAddExercise }: WorkoutCardProps) {
 						<Button
 							variant="ghost"
 							size="icon"
-							className="h-7 w-7 text-secondary-text hover:text-red-500"
+							className="h-7 w-7 text-secondary-text hover:text-destructive-text"
 							onClick={handleDelete}
 							disabled={isPending}
 						>
@@ -128,7 +128,7 @@ export function WorkoutCard({ workout, onAddExercise }: WorkoutCardProps) {
 				</div>
 
 				{/* Summary stats */}
-				{error ? <p className="text-sm text-red-500">{error}</p> : null}
+				{error ? <p className="text-sm text-destructive-text">{error}</p> : null}
 				<WorkoutStatsSummary workout={workout} />
 			</CardHeader>
 

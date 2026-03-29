@@ -75,7 +75,7 @@ export function NutritionGoalsForm({
 				<output
 					className={cn(
 						"text-sm",
-						state.status === "success" ? "text-green-600" : "text-red-600"
+						state.status === "success" ? "text-success-text" : "text-destructive-text"
 					)}
 				>
 					{state.message}

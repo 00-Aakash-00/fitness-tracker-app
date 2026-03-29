@@ -296,7 +296,7 @@ export function CreateChallengeSheet() {
 				{step === "customize" && (
 					<SheetFooter>
 						{error ? (
-							<p className="w-full text-sm text-red-500">{error}</p>
+							<p className="w-full text-sm text-destructive-text">{error}</p>
 						) : null}
 						<Button
 							onClick={handleSubmit}

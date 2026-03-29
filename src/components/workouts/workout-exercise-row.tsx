@@ -77,7 +77,7 @@ export function WorkoutExerciseRow({
 		<div
 			className={cn(
 				"rounded-lg border border-border bg-primary-surface transition-colors",
-				workoutExercise.isCompleted && "border-green-200"
+				workoutExercise.isCompleted && "border-success/20"
 			)}
 		>
 			{/* Header */}
@@ -88,8 +88,8 @@ export function WorkoutExerciseRow({
 					className={cn(
 						"flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
 						workoutExercise.isCompleted
-							? "border-green-500 bg-green-500 text-white"
-							: "border-border text-transparent hover:border-green-400"
+							? "border-success bg-success text-white"
+							: "border-border text-transparent hover:border-success"
 					)}
 				>
 					<Check className="h-3 w-3" />
@@ -105,7 +105,7 @@ export function WorkoutExerciseRow({
 							className={cn(
 								"font-primary text-sm font-medium",
 								workoutExercise.isCompleted
-									? "text-green-700 line-through"
+									? "text-success-text line-through"
 									: "text-primary-text"
 							)}
 						>

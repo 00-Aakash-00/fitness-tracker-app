@@ -22,7 +22,7 @@ const setTypeColors: Record<SetType, string> = {
 	warmup: "text-brand-soft",
 	working: "text-primary-text",
 	dropset: "text-brand-warm",
-	failure: "text-red-500",
+	failure: "text-destructive-text",
 };
 
 export function ExerciseSetRow({
@@ -36,7 +36,7 @@ export function ExerciseSetRow({
 		<div
 			className={cn(
 				"flex items-center gap-1.5 rounded-md px-2 py-1",
-				set.isCompleted && "bg-green-50"
+				set.isCompleted && "bg-success-surface"
 			)}
 		>
 			{/* Set number */}
@@ -114,8 +114,8 @@ export function ExerciseSetRow({
 				className={cn(
 					"flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors",
 					set.isCompleted
-						? "border-green-500 bg-green-500 text-white"
-						: "border-border text-transparent hover:border-green-400"
+						? "border-success bg-success text-white"
+						: "border-border text-transparent hover:border-success"
 				)}
 			>
 				<Check className="h-3 w-3" />
@@ -125,7 +125,7 @@ export function ExerciseSetRow({
 			<Button
 				variant="ghost"
 				size="icon"
-				className="h-6 w-6 shrink-0 text-secondary-text hover:text-red-500"
+				className="size-6 shrink-0 text-secondary-text hover:text-destructive-text"
 				onClick={() => onDelete(set.id)}
 			>
 				<Trash2 className="h-3 w-3" />

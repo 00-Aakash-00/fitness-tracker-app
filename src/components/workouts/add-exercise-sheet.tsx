@@ -139,7 +139,7 @@ export function AddExerciseSheet({
 					{/* Exercise list grouped by muscle */}
 					<div className="max-h-[60vh] overflow-y-auto">
 						{error ? (
-							<p className="mb-3 text-sm text-red-500">{error}</p>
+							<p className="mb-3 text-sm text-destructive-text">{error}</p>
 						) : null}
 						{Object.entries(filteredGroups).map(([group, exList]) => (
 							<div key={group} className="mb-3">

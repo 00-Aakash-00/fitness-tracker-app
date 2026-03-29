@@ -56,7 +56,7 @@ export function MealCard({ meal, onEdit, onDelete }: MealCardProps) {
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-7 w-7 text-secondary-text hover:text-red-500"
+					className="h-7 w-7 text-secondary-text hover:text-destructive-text"
 					onClick={onDelete}
 					aria-label={`Delete ${meal.name}`}
 				>

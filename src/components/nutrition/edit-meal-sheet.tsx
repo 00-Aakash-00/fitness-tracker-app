@@ -164,7 +164,7 @@ function EditMealForm({ meal, onClose }: { meal: Meal; onClose: () => void }) {
 				) : null}
 			</div>
 
-			{error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+			{error ? <p className="mt-2 text-sm text-destructive-text">{error}</p> : null}
 
 			<SheetFooter className="mt-4 flex-col gap-2 sm:flex-col">
 				<Button
