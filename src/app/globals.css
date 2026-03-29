@@ -26,6 +26,22 @@
 	--color-border: #e5e7eb;
 	--color-input-bg: #f3f4f6;
 
+	/* Semantic - Destructive */
+	--color-destructive: #ef4444;
+	--color-destructive-hover: #dc2626;
+	--color-destructive-text: #ef4444;
+
+	/* Semantic - Success */
+	--color-success: #22c55e;
+	--color-success-hover: #16a34a;
+	--color-success-text: #15803d;
+	--color-success-surface: #f0fdf4;
+
+	/* Semantic - Warning */
+	--color-warning: #f59e0b;
+	--color-warning-text: #b45309;
+	--color-warning-surface: #fffbeb;
+
 	/* Gradients */
 	--gradient-cool: linear-gradient(135deg, #1d83ab 0%, #4651ba 100%);
 	--gradient-warm: linear-gradient(
@@ -53,6 +69,81 @@
 }
 
 /* ========================================
+   Dark Mode - Design System Overrides
+   ======================================== */
+
+.dark {
+	/* Primary Colors */
+	--color-primary-surface: #0a1628;
+	--color-primary-text: #f3f4f6;
+
+	/* Secondary Colors */
+	--color-secondary-surface: #050a14;
+	--color-secondary-text: #9ca3af;
+
+	/* Brand Colors - Cool (Electric blue scale) */
+	--color-brand-cool: #3399ff;
+	--color-brand-deep: #0066ff;
+
+	/* Brand Colors - Warm (slightly desaturated for dark bg) */
+	--color-brand-warm: #e09040;
+	--color-brand-soft: #e6c060;
+	--color-brand-pink: #d4899a;
+
+	/* Neutrals */
+	--color-border: rgba(42, 79, 122, 0.3);
+	--color-input-bg: #0f2240;
+
+	/* Semantic - Destructive (desaturated for dark bg) */
+	--color-destructive: #f87171;
+	--color-destructive-hover: #ef4444;
+	--color-destructive-text: #fca5a5;
+
+	/* Semantic - Success (desaturated, lighter for visibility) */
+	--color-success: #4ade80;
+	--color-success-hover: #22c55e;
+	--color-success-text: #86efac;
+	--color-success-surface: rgba(34, 197, 94, 0.1);
+
+	/* Semantic - Warning (desaturated for dark bg) */
+	--color-warning: #fbbf24;
+	--color-warning-text: #fcd34d;
+	--color-warning-surface: rgba(245, 158, 11, 0.1);
+
+	/* Gradients (electric blue tones) */
+	--gradient-cool: linear-gradient(135deg, #0066ff 0%, #3399ff 100%);
+	--gradient-warm: linear-gradient(
+		135deg,
+		#e09040 0%,
+		#e6c060 45%,
+		#d4899a 100%
+	);
+}
+
+/* ========================================
+   Dark Mode - Glass & Glow Utilities
+   ======================================== */
+
+.dark .glass-surface {
+	background: rgba(10, 22, 40, 0.65);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(42, 79, 122, 0.3);
+}
+
+.dark .glow-blue-sm {
+	box-shadow: 0 0 20px rgba(0, 102, 255, 0.15);
+}
+
+.dark .glow-blue-md {
+	box-shadow: 0 0 40px rgba(0, 102, 255, 0.25);
+}
+
+.dark .glow-blue-lg {
+	box-shadow: 0 0 80px rgba(0, 102, 255, 0.4);
+}
+
+/* ========================================
    Tailwind v4 Theme Configuration
    ======================================== */
 
@@ -69,6 +160,16 @@
 	--color-brand-pink: var(--color-brand-pink);
 	--color-border: var(--color-border);
 	--color-input-bg: var(--color-input-bg);
+	--color-destructive: var(--color-destructive);
+	--color-destructive-hover: var(--color-destructive-hover);
+	--color-destructive-text: var(--color-destructive-text);
+	--color-success: var(--color-success);
+	--color-success-hover: var(--color-success-hover);
+	--color-success-text: var(--color-success-text);
+	--color-success-surface: var(--color-success-surface);
+	--color-warning: var(--color-warning);
+	--color-warning-text: var(--color-warning-text);
+	--color-warning-surface: var(--color-warning-surface);
 
 	/* Font Families */
 	--font-sans: var(--font-primary);

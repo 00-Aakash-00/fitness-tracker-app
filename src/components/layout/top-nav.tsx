@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { NotificationFeedItem } from "@/lib/notifications.server";
 import type { TodayAtAGlance } from "@/lib/progress/progress.types";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { CommandSearch } from "./command-search";
 import { NotificationPanel } from "./notification-panel";
 import { TodayAtAGlancePopover } from "./today-at-a-glance-popover";
@@ -106,6 +107,7 @@ export function TopNav({
 					<div className="md:hidden">
 						<CommandSearch />
 					</div>
+					<ThemeToggle />
 					<NotificationPanel
 						key={notifications.map((notification) => notification.id).join(":")}
 						initialNotifications={notifications}

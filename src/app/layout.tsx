@@ -9,6 +9,7 @@ import {
 	Space_Grotesk,
 } from "next/font/google";
 import { Header } from "@/components/layout/header";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -55,12 +56,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 			signUpFallbackRedirectUrl="/dashboard"
 			afterSignOutUrl="/sign-in"
 		>
-			<html lang="en">
+			<html lang="en" suppressHydrationWarning>
 				<body
 					className={`${spaceGrotesk.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} ${GeistSans.variable} antialiased`}
 				>
-					<Header />
-					{children}
+					<ThemeProvider>
+						<Header />
+						{children}
+					</ThemeProvider>
 				</body>
 			</html>
 		</ClerkProvider>

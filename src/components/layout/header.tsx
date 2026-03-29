@@ -4,6 +4,7 @@ import { UserButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppLogo } from "@/components/layout/app-logo";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
@@ -29,6 +30,7 @@ export function Header() {
 		>
 			<AppLogo href="/" priority />
 			<nav className="flex items-center gap-2 md:gap-4">
+				<ThemeToggle />
 				{!isLoaded ? null : !isSignedIn ? (
 					<>
 						<Button asChild variant="outline" size="default">
