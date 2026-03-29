@@ -6,13 +6,11 @@ import {
 	Inter,
 	JetBrains_Mono,
 	Playfair_Display,
-	Space_Grotesk, Geist } from "next/font/google";
+	Space_Grotesk,
+} from "next/font/google";
 import { Header } from "@/components/layout/header";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import "./globals.css";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const spaceGrotesk = Space_Grotesk({
 	variable: "--font-space-grotesk",
@@ -45,8 +43,12 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-	title: "Fitness Tracker",
-	description: "Track your fitness journey",
+	title: {
+		default: "iAM360",
+		template: "%s | iAM360",
+	},
+	description: "Your complete fitness command center — workouts, nutrition, goals, and progress.",
+	applicationName: "iAM360",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -58,7 +60,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 			signUpFallbackRedirectUrl="/dashboard"
 			afterSignOutUrl="/sign-in"
 		>
-			<html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
+			<html lang="en" suppressHydrationWarning>
 				<body
 					className={`${spaceGrotesk.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} ${GeistSans.variable} antialiased`}
 				>
