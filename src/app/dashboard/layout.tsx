@@ -1,10 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Footer } from "@/components/layout/footer";
-import { Sidebar } from "@/components/layout/sidebar";
 import { TimezoneSync } from "@/components/layout/timezone-sync";
 import { TopNav } from "@/components/layout/top-nav";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { getDashboardShellData } from "@/lib/app-shell.server";
 import { getSupabaseUserIdByClerkId } from "@/lib/integrations/oauth-connections.server";
 import { parseStepGoal, STEP_GOAL_COOKIE } from "@/lib/preferences";
@@ -18,6 +20,8 @@ export default async function DashboardLayout({
 	}
 
 	const stepGoal = parseStepGoal(cookieStore.get(STEP_GOAL_COOKIE)?.value);
+	const sidebarOpen =
+		cookieStore.get("sidebar_state")?.value !== "false";
 
 	let shellData: Awaited<ReturnType<typeof getDashboardShellData>> | null =
 		null;
@@ -30,17 +34,19 @@ export default async function DashboardLayout({
 	}
 
 	return (
-		<div className="flex min-h-screen">
-			<Sidebar />
-			<div className="flex flex-1 flex-col bg-secondary-surface lg:ml-[72px]">
-				<TopNav
-					todayAtAGlance={shellData?.todayAtAGlance ?? null}
-					notifications={shellData?.notifications ?? []}
-				/>
-				<TimezoneSync currentTimezone={shellData?.timezone ?? null} />
-				<main className="flex-1 p-4 md:p-6">{children}</main>
-				<Footer />
-			</div>
-		</div>
+		<SidebarProvider defaultOpen={sidebarOpen}>
+			<TooltipProvider>
+				<AppSidebar />
+				<div className="flex flex-1 flex-col bg-secondary-surface">
+					<TopNav
+						todayAtAGlance={shellData?.todayAtAGlance ?? null}
+						notifications={shellData?.notifications ?? []}
+					/>
+					<TimezoneSync currentTimezone={shellData?.timezone ?? null} />
+					<main className="flex-1 p-4 md:p-6">{children}</main>
+					<Footer />
+				</div>
+			</TooltipProvider>
+		</SidebarProvider>
 	);
 }
