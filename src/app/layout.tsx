@@ -6,11 +6,13 @@ import {
 	Inter,
 	JetBrains_Mono,
 	Playfair_Display,
-	Space_Grotesk,
-} from "next/font/google";
+	Space_Grotesk, Geist } from "next/font/google";
 import { Header } from "@/components/layout/header";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const spaceGrotesk = Space_Grotesk({
 	variable: "--font-space-grotesk",
@@ -56,7 +58,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 			signUpFallbackRedirectUrl="/dashboard"
 			afterSignOutUrl="/sign-in"
 		>
-			<html lang="en" suppressHydrationWarning>
+			<html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
 				<body
 					className={`${spaceGrotesk.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} ${GeistSans.variable} antialiased`}
 				>
